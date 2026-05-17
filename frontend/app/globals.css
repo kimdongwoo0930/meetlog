@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f9f8f6;
+  --surface: #ffffff;
+  --border: #e8e5de;
+  --sidebar-bg: #1a1916;
+  --text-primary: #1a1916;
+  --text-secondary: #6b6760;
+  --text-tertiary: #a8a49e;
+  --accent: #2563eb;
+  --accent-light: #eff4ff;
+  --accent-border: #c7d9fd;
+  --green: #16a34a;
+  --green-light: #f0fdf4;
+  --green-border: #bbf7d0;
+  --amber: #d97706;
+  --amber-light: #fffbeb;
+  --red: #dc2626;
+  --red-light: #fef2f2;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+}
