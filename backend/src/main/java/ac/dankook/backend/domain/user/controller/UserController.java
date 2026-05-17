@@ -16,6 +16,11 @@ public class UserController {
 
     private final UserService userService;
 
+    @GetMapping("/me")
+    public ResponseEntity<UserResponse> getMe() {
+        return ResponseEntity.ok(userService.getMe());
+    }
+
     @GetMapping("/search")
     public ResponseEntity<UserResponse> searchByEmail(@RequestParam String email) {
         return ResponseEntity.ok(userService.searchByEmail(email));

@@ -1,7 +1,9 @@
 'use client';
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { authApi } from "@/src/lib/api";
 
 const NAV_ITEMS = [
   {
@@ -45,6 +47,26 @@ function NavItem({ href, label, icon, active }: { href: string; label: string; i
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [userName, setUserName] = useState("");
+  const [userInitial, setUserInitial] = useState("");
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+    const name = localStorage.getItem("userName") ?? "";
+    const email = localStorage.getItem("userEmail") ?? "";
+    setUserName(name || email.split("@")[0]);
+    setUserInitial((name || email).slice(0, 1).toUpperCase());
+    setChecked(true);
+  }, [router]);
+
+  // 토큰 없으면 레이아웃을 렌더하지 않음 (리다이렉트 중)
+  if (!checked) return null;
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
@@ -70,14 +92,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div style={{ padding: "12px 10px", borderTop: "1px solid rgba(255,255,255,0.07)" }}>
           <div style={{
             display: "flex", alignItems: "center", gap: 9,
-            padding: "8px 10px", borderRadius: 7, cursor: "pointer",
+            padding: "8px 10px", borderRadius: 7,
           }}>
             <div style={{
               width: 28, height: 28, borderRadius: "50%",
               background: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 11, fontWeight: 600, color: "#fff", flexShrink: 0,
-            }}>김</div>
-            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.75)" }}>김동우</div>
+            }}>{userInitial}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userName}</div>
+            </div>
+            <button
+              onClick={() => authApi.logout()}
+              title="로그아웃"
+              style={{
+                background: "none", border: "none", cursor: "pointer",
+                color: "rgba(255,255,255,0.35)", padding: 4, borderRadius: 4,
+                display: "flex", alignItems: "center",
+              }}>
+              <svg viewBox="0 0 16 16" fill="none" width="14" height="14">
+                <path d="M6 3H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                <path d="M10 5l3 3-3 3M13 8H6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
           </div>
         </div>
       </aside>

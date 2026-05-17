@@ -21,6 +21,8 @@ export function useWebRTC(meetingId: string, myId: string) {
 
   // peerId → RTCPeerConnection
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
+  // setRemoteDescription 전에 도착한 ICE candidates 임시 보관
+  const iceCandidateBuffer = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const stompRef = useRef<Client | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
 
@@ -37,7 +39,13 @@ export function useWebRTC(meetingId: string, myId: string) {
     pc.ontrack = (event) => {
       setRemoteStreams(prev => {
         const exists = prev.find(r => r.peerId === peerId);
-        if (exists) return prev;
+        if (exists) {
+          // 이미 있지만 stream이 null이면 (onconnectionstatechange가 먼저 온 경우) 업데이트
+          if (!exists.stream) {
+            return prev.map(r => r.peerId === peerId ? { ...r, stream: event.streams[0] } : r);
+          }
+          return prev;
+        }
         return [...prev, { peerId, stream: event.streams[0] }];
       });
     };
@@ -98,21 +106,39 @@ export function useWebRTC(meetingId: string, myId: string) {
       await pc.setRemoteDescription(new RTCSessionDescription(payload as RTCSessionDescriptionInit));
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
+      // answer를 먼저 보내고, 버퍼에 쌓인 ICE candidates 추가
       stompRef.current?.publish({
         destination: `/app/meetings/${meetingId}/signal`,
         body: JSON.stringify({ type: 'answer', from: myId, to: from, payload: answer }),
       });
+      const buffered = iceCandidateBuffer.current.get(from) ?? [];
+      iceCandidateBuffer.current.delete(from);
+      for (const c of buffered) {
+        await pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+      }
 
     } else if (type === 'answer' && message.to === myId) {
       const pc = peerConnections.current.get(from);
       if (pc && pc.signalingState === 'have-local-offer') {
         await pc.setRemoteDescription(new RTCSessionDescription(payload as RTCSessionDescriptionInit));
+        // answer 처리 완료 후 버퍼에 쌓인 ICE candidates 추가
+        const buffered = iceCandidateBuffer.current.get(from) ?? [];
+        iceCandidateBuffer.current.delete(from);
+        for (const c of buffered) {
+          await pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+        }
       }
 
     } else if (type === 'ice-candidate' && message.to === myId) {
       const pc = peerConnections.current.get(from);
-      if (pc && pc.remoteDescription !== null) {
+      if (!pc) return;
+      if (pc.remoteDescription !== null) {
         await pc.addIceCandidate(new RTCIceCandidate(payload as RTCIceCandidateInit));
+      } else {
+        // remoteDescription 설정 전에 도착한 candidate는 버퍼에 보관
+        const buf = iceCandidateBuffer.current.get(from) ?? [];
+        buf.push(payload as RTCIceCandidateInit);
+        iceCandidateBuffer.current.set(from, buf);
       }
 
     } else if (type === 'leave') {

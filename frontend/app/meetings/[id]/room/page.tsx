@@ -28,6 +28,7 @@ const DARK = {
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
+const AI_URL = process.env.NEXT_PUBLIC_AI_URL ?? 'http://localhost:8000';
 
 function VideoTile({ label, isMe, isMuted, isCameraOff, videoRef, muted }: {
   label: string; isMe?: boolean; isMuted?: boolean; isCameraOff?: boolean;
@@ -50,8 +51,11 @@ function VideoTile({ label, isMe, isMuted, isCameraOff, videoRef, muted }: {
         />
       )}
       {isCameraOff && (
-        <div style={{ width: 56, height: 56, borderRadius: "50%", background: "linear-gradient(135deg,#2563eb,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 600, color: "#fff" }}>
-          {label.slice(0, 1)}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 64, height: 64, borderRadius: "50%", background: "linear-gradient(135deg,#2563eb,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 700, color: "#fff", boxShadow: "0 4px 20px rgba(0,0,0,0.3)" }}>
+            {label.slice(0, 1)}
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: DARK.textSecondary }}>{label}</div>
         </div>
       )}
       <div style={{ position: "absolute", bottom: 10, left: 12, right: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -74,22 +78,53 @@ function VideoTile({ label, isMe, isMuted, isCameraOff, videoRef, muted }: {
 
 function RemoteVideoTile({ peerId, stream }: { peerId: string; stream: MediaStream | null }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [hasVideo, setHasVideo] = useState(false);
+
   useEffect(() => {
-    if (videoRef.current && stream) videoRef.current.srcObject = stream;
+    if (!stream) { setHasVideo(false); return; }
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(() => {});
+    }
+
+    const track = stream.getVideoTracks()[0];
+    if (!track) { setHasVideo(false); return; }
+
+    // track.muted: ICE 연결 전엔 데이터 없어 muted 상태 → 아바타 표시
+    // onunmute: 데이터가 실제로 흐르기 시작하면 캠으로 전환
+    setHasVideo(track.enabled && track.readyState === 'live' && !track.muted);
+    track.onmute = () => setHasVideo(false);
+    track.onunmute = () => setHasVideo(true);
+    return () => { track.onmute = null; track.onunmute = null; };
   }, [stream]);
+
   const initial = peerId.slice(0, 1).toUpperCase();
+  const shortId = peerId.includes('@') ? peerId.split('@')[0] : peerId;
+
   return (
     <div style={{
       background: DARK.surface, border: `1px solid ${DARK.border}`,
       borderRadius: 12, position: "relative", overflow: "hidden",
-      display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0,
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0, gap: 10,
     }}>
-      {stream
-        ? <video ref={videoRef} autoPlay playsInline style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-        : <div style={{ width: 56, height: 56, borderRadius: "50%", background: "linear-gradient(135deg,#16a34a,#0d9488)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 600, color: "#fff" }}>{initial}</div>
-      }
+      <video
+        ref={videoRef} autoPlay playsInline
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: hasVideo ? "block" : "none" }}
+      />
+      {!hasVideo && (
+        <>
+          <div style={{
+            width: 64, height: 64, borderRadius: "50%",
+            background: "linear-gradient(135deg,#16a34a,#0d9488)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 24, fontWeight: 700, color: "#fff",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+          }}>{initial}</div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: DARK.textSecondary }}>{shortId}</div>
+        </>
+      )}
       <div style={{ position: "absolute", bottom: 10, left: 12, fontSize: 12.5, fontWeight: 500, color: "#fff", background: "rgba(0,0,0,0.45)", padding: "3px 8px", borderRadius: 5, backdropFilter: "blur(4px)" }}>
-        {peerId}
+        {shortId}
       </div>
     </div>
   );
@@ -107,17 +142,28 @@ export default function MeetingRoomPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'transcript' | 'ai' | 'participants'>('transcript');
   const [seconds, setSeconds] = useState(0);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(false); // restored from sessionStorage in useEffect
   const [isCameraOff, setIsCameraOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [hostEmail, setHostEmail] = useState<string | null>(null);
   const [ending, setEnding] = useState(false);
 
-  // WebRTC
-  const myId = typeof window !== 'undefined' ? (localStorage.getItem('userEmail') ?? 'anonymous') : 'anonymous';
+  // WebRTC — useRef로 myId를 첫 클라이언트 렌더부터 고정 (재초기화 방지)
+  const myIdRef = useRef(typeof window !== 'undefined' ? (localStorage.getItem('userEmail') ?? 'anonymous') : 'anonymous');
+  const myId = myIdRef.current;
   const { localStream, remoteStreams, isReady, toggleMic, toggleCamera } = useWebRTC(id, myId);
   const localVideoRef = useRef<HTMLVideoElement>(null);
+
+  // 화면 표시용 이메일 (참여자 탭 isMe 판별)
+  const [myEmail, setMyEmail] = useState('');
+  useEffect(() => { setMyEmail(localStorage.getItem('userEmail') ?? ''); }, []);
+
+  // 마이크 상태를 sessionStorage에서 복원 (새로고침 후에도 유지)
+  const MIC_KEY = `meetingMicMuted_${id}`;
+  useEffect(() => {
+    if (sessionStorage.getItem(MIC_KEY) === 'true') setIsMuted(true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // WebSocket 상태
   const [transcripts, setTranscripts] = useState<TranscriptItem[]>([]);
@@ -128,7 +174,6 @@ export default function MeetingRoomPage() {
 
   // 참여자 목록
   const [participants, setParticipants] = useState<UserSummary[]>([]);
-  const myEmail = typeof window !== 'undefined' ? (localStorage.getItem('userEmail') ?? '') : '';
 
   // 참여자 초대
   const [inviteEmail, setInviteEmail] = useState("");
@@ -152,8 +197,13 @@ export default function MeetingRoomPage() {
     }
   };
   const stompRef = useRef<Client | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const isRecordingRef = useRef(false);   // VAD 루프 활성 여부
+  const isSpeakingRef = useRef(false);    // 현재 말하는 중 여부
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const maxChunkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const vadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const segmentTimeRef = useRef(0);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
@@ -207,6 +257,7 @@ export default function MeetingRoomPage() {
       setEnding(false);
       return;
     }
+    sessionStorage.removeItem(MIC_KEY);
     router.push(`/meetings/${id}`);
   };
 
@@ -241,60 +292,161 @@ export default function MeetingRoomPage() {
 
     stompRef.current = client;
     client.activate();
-    return () => { client.deactivate(); };
-  }, [id]);
 
-  // 음성인식 시작
-  const startListening = useCallback(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-
-    const recognition = new SR();
-    recognition.lang = 'ko-KR';
-    recognition.continuous = true;
-    recognition.interimResults = false;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    recognition.onresult = async (event: any) => {
-      const text = event.results[event.results.length - 1][0].transcript.trim();
-      if (!text) return;
-
-      const startTime = segmentTimeRef.current;
-      const endTime = startTime + 3;
-      segmentTimeRef.current = endTime;
-
-      await fetch(`${API_URL}/api/meetings/${id}/segments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') ?? ''}`,
-        },
-        body: JSON.stringify({ speaker: '나', content: text, startTime, endTime }),
-      }).catch(() => null);
+    // 뒤로가기 / 탭 닫기 시 leave 신호 보장
+    const sendLeave = () => {
+      if (stompRef.current?.connected) {
+        stompRef.current.publish({
+          destination: `/app/meetings/${id}/signal`,
+          body: JSON.stringify({ type: 'leave', from: myId, to: null, payload: null }),
+        });
+      }
     };
+    window.addEventListener('beforeunload', sendLeave);
 
-    recognition.onerror = () => setIsListening(false);
-    recognition.onend = () => {
-      // continuous 모드가 끊기면 재시작
-      if (isListening) recognition.start();
+    return () => {
+      window.removeEventListener('beforeunload', sendLeave);
+      client.deactivate();
     };
+  }, [id, myId]);
 
-    recognitionRef.current = recognition;
-    recognition.start();
+  // 오디오 청크 → ai-server → 백엔드 저장
+  const sendAudioChunk = useCallback(async (blob: Blob) => {
+    if (blob.size < 1000) return; // 너무 짧은 조각은 스킵
+
+    const formData = new FormData();
+    formData.append('audio', blob, 'audio.webm');
+
+    let text = '';
+    try {
+      const res = await fetch(`${AI_URL}/transcribe`, { method: 'POST', body: formData });
+      if (!res.ok) return;
+      ({ text } = await res.json());
+    } catch { return; }
+
+    if (!text?.trim()) return;
+
+    const startTime = segmentTimeRef.current;
+    const endTime = startTime + 5;
+    segmentTimeRef.current = endTime;
+
+    await fetch(`${API_URL}/api/meetings/${id}/segments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('access_token') ?? ''}`,
+      },
+      body: JSON.stringify({ speaker: myId, content: text.trim(), startTime, endTime }),
+    }).catch(() => {});
+  }, [id, myId]);
+
+  // VAD 기반 녹음: 말하면 시작, 침묵 1초면 전송
+  const startRecording = useCallback((stream: MediaStream) => {
+    if (isRecordingRef.current) return;
+    const audioTracks = stream.getAudioTracks();
+    if (audioTracks.length === 0) return;
+
+    isRecordingRef.current = true;
     setIsListening(true);
-  }, [id, isListening]);
 
-  // 음성인식 중지
-  const stopListening = useCallback(() => {
-    recognitionRef.current?.stop();
-    recognitionRef.current = null;
+    const audioStream = new MediaStream(audioTracks);
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : 'audio/webm';
+
+    const audioCtx = new AudioContext();
+    audioContextRef.current = audioCtx;
+    const source = audioCtx.createMediaStreamSource(audioStream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    source.connect(analyser);
+    const dataArray = new Float32Array(analyser.fftSize);
+
+    const SILENCE_THRESHOLD = 0.008;  // 이 값 이하면 침묵
+    const SILENCE_DELAY = 1000;       // 침묵 1초 후 전송
+    const MAX_CHUNK = 30000;          // 최대 30초 강제 전송
+
+    let chunks: Blob[] = [];
+
+    const stopChunk = () => {
+      if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null; }
+      if (maxChunkTimerRef.current) { clearTimeout(maxChunkTimerRef.current); maxChunkTimerRef.current = null; }
+      if (mediaRecorderRef.current?.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+      isSpeakingRef.current = false;
+    };
+
+    const startChunk = () => {
+      chunks = [];
+      const recorder = new MediaRecorder(audioStream, { mimeType });
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = () => {
+        sendAudioChunk(new Blob(chunks, { type: mimeType }));
+      };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      isSpeakingRef.current = true;
+
+      // 최대 30초 강제 컷
+      maxChunkTimerRef.current = setTimeout(stopChunk, MAX_CHUNK);
+    };
+
+    // 100ms마다 음량 체크
+    vadIntervalRef.current = setInterval(() => {
+      if (!isRecordingRef.current) return;
+      analyser.getFloatTimeDomainData(dataArray);
+      const rms = Math.sqrt(dataArray.reduce((s, v) => s + v * v, 0) / dataArray.length);
+      const isSpeaking = rms > SILENCE_THRESHOLD;
+
+      if (isSpeaking) {
+        // 침묵 타이머 리셋
+        if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null; }
+        // 말하기 시작 → 녹음 시작
+        if (!isSpeakingRef.current) startChunk();
+      } else {
+        // 말하다가 침묵 진입 → 1초 후 전송
+        if (isSpeakingRef.current && !silenceTimerRef.current) {
+          silenceTimerRef.current = setTimeout(stopChunk, SILENCE_DELAY);
+        }
+      }
+    }, 100);
+  }, [sendAudioChunk]);
+
+  const stopRecording = useCallback(() => {
+    isRecordingRef.current = false;
+    isSpeakingRef.current = false;
     setIsListening(false);
+    if (vadIntervalRef.current) { clearInterval(vadIntervalRef.current); vadIntervalRef.current = null; }
+    if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null; }
+    if (maxChunkTimerRef.current) { clearTimeout(maxChunkTimerRef.current); maxChunkTimerRef.current = null; }
+    if (mediaRecorderRef.current?.state === 'recording') { mediaRecorderRef.current.stop(); }
+    mediaRecorderRef.current = null;
+    audioContextRef.current?.close();
+    audioContextRef.current = null;
   }, []);
+
+  // localStream 준비되면 자동 녹음 시작 (단, 음소거 상태면 트랙만 비활성화)
+  useEffect(() => {
+    if (!localStream) return;
+    const wasMuted = sessionStorage.getItem(MIC_KEY) === 'true';
+    if (wasMuted) {
+      localStream.getAudioTracks().forEach(t => { t.enabled = false; });
+    } else {
+      startRecording(localStream);
+    }
+    return () => { isRecordingRef.current = false; };
+  }, [localStream]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleToggleMic = () => {
     toggleMic();
-    if (!isMuted) stopListening(); else startListening();
+    if (!isMuted) {
+      stopRecording();
+      sessionStorage.setItem(MIC_KEY, 'true');
+    } else if (localStream) {
+      startRecording(localStream);
+      sessionStorage.removeItem(MIC_KEY);
+    }
     setIsMuted(v => !v);
   };
 
@@ -626,7 +778,12 @@ export default function MeetingRoomPage() {
                           </div>
                           <div style={{ fontSize: 11.5, color: DARK.textTertiary }}>{p.email}</div>
                         </div>
-                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: isConnected ? DARK.green : DARK.textTertiary, flexShrink: 0 }} />
+                        <span style={{
+                          fontSize: 11, fontWeight: 500, padding: "2px 7px", borderRadius: 999, flexShrink: 0,
+                          background: isConnected ? DARK.greenDim : "rgba(255,255,255,0.05)",
+                          color: isConnected ? DARK.green : DARK.textTertiary,
+                          border: `1px solid ${isConnected ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.08)"}`,
+                        }}>{isConnected ? "참여 중" : "미접속"}</span>
                       </div>
                     );
                   })}

@@ -1,6 +1,32 @@
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+// 동시에 여러 401이 발생해도 refresh를 한 번만 실행
+let refreshingPromise: Promise<void> | null = null;
+
+async function doRefresh(): Promise<void> {
+  const refreshToken = typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null;
+  if (!refreshToken) throw new Error("No refresh token");
+
+  const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refreshToken }),
+  });
+  if (!res.ok) throw new Error("Refresh failed");
+
+  const data: { accessToken: string; refreshToken: string } = await res.json();
+  localStorage.setItem("access_token", data.accessToken);
+  localStorage.setItem("refresh_token", data.refreshToken);
+}
+
+function clearAuth() {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  localStorage.removeItem("userEmail");
+  localStorage.removeItem("userName");
+}
+
+async function request<T>(path: string, init?: RequestInit, isRetry = false): Promise<T> {
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
@@ -10,6 +36,28 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...init?.headers,
     },
   });
+
+  if (res.status === 401 && !isRetry) {
+    const storedRefreshToken = typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null;
+    if (!storedRefreshToken) {
+      // 로그인/회원가입 시 잘못된 인증 정보 → 그냥 에러로 처리
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.message ?? "이메일 또는 비밀번호가 올바르지 않습니다.");
+    }
+    // 로그인된 상태에서 토큰 만료 → refresh 시도
+    try {
+      if (!refreshingPromise) {
+        refreshingPromise = doRefresh().finally(() => { refreshingPromise = null; });
+      }
+      await refreshingPromise;
+      return request<T>(path, init, true);
+    } catch {
+      clearAuth();
+      if (typeof window !== "undefined") window.location.href = "/login";
+      throw new Error("세션이 만료되었습니다. 다시 로그인해주세요.");
+    }
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.message ?? `HTTP ${res.status}`);
@@ -30,10 +78,14 @@ export const authApi = {
       body: JSON.stringify({ email, password, name }),
     }),
   refresh: (refreshToken: string) =>
-    request<{ accessToken: string }>("/api/auth/refresh", {
+    request<{ accessToken: string; refreshToken: string }>("/api/auth/refresh", {
       method: "POST",
       body: JSON.stringify({ refreshToken }),
     }),
+  logout: () => {
+    clearAuth();
+    if (typeof window !== "undefined") window.location.href = "/login";
+  },
 };
 
 // Meetings
@@ -86,6 +138,7 @@ export interface UserSummary {
 }
 
 export const userApi = {
+  me: () => request<UserSummary>("/api/users/me"),
   searchByEmail: (email: string) => request<UserSummary>(`/api/users/search?email=${encodeURIComponent(email)}`),
 };
 

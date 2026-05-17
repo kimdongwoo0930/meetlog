@@ -6,206 +6,172 @@
 
 <br /><br />
 
-
 # 🎙️ MeetLog
 
-**실시간 회의 내용을 기록하고, AI를 통해 회의록과 할 일을 자동 생성하는 협업 플랫폼**
-
-<br />
-
-> 긴 회의 내용을 직접 정리하는 번거로움을 줄이고,  
-> 팀이 중요한 의사결정과 협업에 더 집중할 수 있도록 설계되었습니다.
+**실시간 음성 회의를 기록하고, AI가 회의록·결정사항·할 일을 자동 생성하는 협업 플랫폼**
 
 </div>
 
-<br />
+---
 
-
-## ✨ 주요 기능
-
-### 🎙 실시간 회의
-- 회의방 생성 및 참여
-- 실시간 음성 통신 (WebRTC)
-- 화면 공유 기능
-- 회의 참여자 관리
-
-### 🤖 AI 회의 분석
-
-회의 종료 후 AI가 자동으로:
-
-- 회의 요약 생성
-- 결정사항 추출
-- 할 일(Action Item) 정리
-- 질문 및 논의 내용 분석
-- 다음 회의 안건 정리
-
-### 📝 자동 회의록 생성
-
-MeetLog는 긴 회의 내용을 구조화된 회의록 형태로 자동 정리합니다.
-
-**예시 출력:**
+## 📁 프로젝트 구조
 
 ```
-회의 요약
-  - 로그인 기능 구현 방향 논의
-
-결정사항
-  - JWT 인증 방식 사용
-  - Frontend는 Next.js 사용
-  - Backend는 Spring Boot 사용
-
-할 일
-  - 동우: 로그인 API 구현
-  - 민수: 로그인 UI 제작
-
-질문
-  - 이메일 인증 기능 추가 여부
-
-다음 회의 안건
-  - API 명세 확정
+meetlog/
+├── frontend/       # Next.js 14 앱 (포트 3000)
+├── backend/        # Spring Boot 3 앱 (포트 8080)
+└── ai-server/      # FastAPI + faster-whisper (포트 8000)
 ```
 
 ---
 
-## 🏗 시스템 구조
+## ✅ 구현 현황
+
+### Frontend
+| 페이지 | 경로 | 상태 |
+|--------|------|------|
+| 랜딩 + 로그인/회원가입 | `/` | ✅ 완료 |
+| 회의 목록 | `/meetings` | ✅ 완료 |
+| 새 회의 생성 | `/meetings/new` | ✅ 완료 |
+| 실시간 회의실 | `/meetings/[id]/room` | ✅ 완료 |
+| 회의록 상세 | `/meetings/[id]` | 🚧 Mock 데이터 |
+| 대시보드 | `/dashboard` | 🚧 미구현 |
+
+### Backend
+| 기능 | 상태 |
+|------|------|
+| 회원가입 / 로그인 (JWT) | ✅ 완료 |
+| 회의 CRUD | ✅ 완료 |
+| 참여자 관리 | ✅ 완료 |
+| WebRTC 시그널링 (STOMP) | ✅ 완료 |
+| 실시간 자막 저장 · 브로드캐스트 | ✅ 완료 |
+| AI 분석 결과 저장 | 🚧 미구현 |
+
+### AI Server
+| 기능 | 상태 |
+|------|------|
+| 음성 → 텍스트 (faster-whisper) | ✅ 완료 |
+| VAD 필터링 (무음 제거) | ✅ 완료 |
+| 회의 요약 / 결정사항 분석 (LLM) | 🚧 미구현 |
+
+---
+
+## 🔄 실시간 STT 파이프라인
 
 ```
-Client (Next.js)
-    │
-    │  WebRTC 실시간 음성 통신
+브라우저 마이크 (VAD 감지)
+    │  말하면 녹음 시작, 1초 침묵하면 자동 전송
     ▼
-회의 음성 녹음
-    │
+POST /transcribe  →  ai-server (faster-whisper)
+    │  한국어 STT 변환
     ▼
-Spring Boot Backend
-    │
+POST /api/meetings/{id}/segments  →  Spring Boot
+    │  DB 저장 + STOMP 브로드캐스트
     ▼
-AI Processing Server (FastAPI)
-    │
-    ├── Whisper STT
-    │
-    └── LLM 요약 및 분석 (Qwen / Llama)
-            │
-            ▼
-    구조화된 회의록 생성
+모든 참여자 화면에 실시간 자막 표시
 ```
+
+---
+
+## 🚀 로컬 개발 환경 세팅
+
+### 사전 요구사항
+- Java 17+
+- Node.js 18+
+- MySQL 8
+- Python 3.11 (conda 권장)
+- ffmpeg (`brew install ffmpeg`)
+
+### 1. Backend
+
+```bash
+cd backend
+# application.properties에 MySQL 접속 정보 설정 후
+./gradlew bootRun
+```
+
+`http://localhost:8080` 에서 실행됨
+
+### 2. Frontend
+
+```bash
+cd frontend
+npm install
+# .env.local 설정 (아래 참고)
+npm run dev
+```
+
+**`.env.local` 예시:**
+```
+NEXT_PUBLIC_API_URL=http://localhost:8080
+NEXT_PUBLIC_AI_URL=http://localhost:8000
+```
+
+`http://localhost:3000` 에서 실행됨
+
+### 3. AI Server
+
+```bash
+cd ai-server
+
+# conda 환경 (최초 1회)
+conda create -n meetlog python=3.11 -y
+conda activate meetlog
+pip install -r requirements.txt
+
+# 서버 실행
+conda activate meetlog
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+`http://localhost:8000/health` → `{"status":"ok","model":"small"}` 확인
+
+> Whisper 모델(`small`)은 첫 `/transcribe` 호출 시 자동 다운로드됩니다.  
+> 미리 받으려면: `python3 -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')"`
+
+---
+
+## 🌐 LAN 환경 (다른 기기에서 테스트)
+
+MacBook에서 서버를 실행하고 Mac Mini 등 다른 기기에서 접속하는 경우:
+
+```bash
+# frontend 실행 시 (이미 package.json에 적용됨)
+npm run dev   # 내부적으로 next dev -H 0.0.0.0
+
+# .env.local에 실제 IP 입력
+NEXT_PUBLIC_API_URL=http://192.168.x.x:8080
+NEXT_PUBLIC_AI_URL=http://192.168.x.x:8000
+```
+
+> ⚠️ HTTP 환경에서는 카메라/마이크 접근이 `localhost`에서만 허용됩니다.  
+> 다른 기기에서 STT를 사용하려면 Chrome 플래그에서 해당 IP를 안전한 출처로 등록하거나 ngrok으로 HTTPS 터널을 사용하세요.
 
 ---
 
 ## 🛠 기술 스택
 
-### Frontend
-| 기술 | 설명 |
+| 영역 | 기술 |
 |------|------|
-| Next.js | React 기반 풀스택 프레임워크 |
-| TypeScript | 정적 타입 언어 |
-| Tailwind CSS | 유틸리티 기반 CSS 프레임워크 |
-| WebRTC | 실시간 P2P 음성 통신 |
-
-### Backend
-| 기술 | 설명 |
-|------|------|
-| Spring Boot | Java 기반 백엔드 프레임워크 |
-| Spring Security | 인증 및 보안 처리 |
-| JPA | ORM 데이터 접근 계층 |
-| MySQL | 관계형 데이터베이스 |
-
-### AI Server
-| 기술 | 설명 |
-|------|------|
-| FastAPI | Python 기반 AI 서버 프레임워크 |
-| faster-whisper | 고성능 음성 인식(STT) |
-| Ollama | 로컬 LLM 실행 환경 |
-| Qwen2.5 / Llama 3 | 회의 분석 및 요약 LLM |
-
-### Infrastructure
-| 기술 | 설명 |
-|------|------|
-| Docker | 컨테이너 기반 환경 |
-| Docker Compose | 멀티 컨테이너 오케스트레이션 |
-| Nginx | 리버스 프록시 서버 |
+| Frontend | Next.js 14, TypeScript, WebRTC, STOMP |
+| Backend | Spring Boot 3, Spring Security, JPA, MySQL |
+| AI Server | FastAPI, faster-whisper, ffmpeg |
+| 실시간 통신 | WebRTC (P2P 영상/음성), STOMP over SockJS (시그널링, 자막) |
 
 ---
 
-## 🧠 AI 처리 과정
+## 📌 환경 변수 정리
 
-MeetLog는 단순 API 호출 방식이 아니라,  
-회의 데이터를 여러 단계로 처리하여 회의록을 생성합니다.
+### frontend/.env.local
+| 변수 | 설명 | 기본값 |
+|------|------|--------|
+| `NEXT_PUBLIC_API_URL` | 백엔드 주소 | `http://localhost:8080` |
+| `NEXT_PUBLIC_AI_URL` | AI 서버 주소 | `http://localhost:8000` |
 
-```
-회의 음성
-    │
-    ▼
-음성 분할
-    │
-    ▼
-STT 변환 (faster-whisper)
-    │
-    ▼
-구간별 요약
-    │
-    ▼
-전체 회의 분석 (LLM)
-    │
-    ▼
-구조화된 회의록 생성
-```
-
-## 🧬 LoRA 기반 모델 파인튜닝
- 
-MeetLog는 범용 LLM의 한계를 넘어, **회의록 생성에 특화된 모델**을 직접 파인튜닝하여 정확도와 품질을 높이는 것을 목표로 합니다.
- 
-### 왜 LoRA인가?
- 
-| 항목 | 설명 |
+### backend/src/main/resources/application.properties
+| 속성 | 설명 |
 |------|------|
-| 효율적인 학습 | 전체 모델 가중치가 아닌 소수의 어댑터 파라미터만 학습 |
-| 낮은 GPU 요구 | 일반 Full Fine-tuning 대비 VRAM 사용량 대폭 절감 |
-| 빠른 실험 | 다양한 설정을 빠르게 실험하고 비교 가능 |
-| 원본 모델 보존 | Base 모델은 그대로 유지하며 어댑터만 교체 가능 |
- 
-### 파인튜닝 파이프라인
- 
-```
-회의 STT 텍스트 (원본 데이터)
-    │
-    ▼
-데이터 전처리 및 포맷 변환
-(instruction / input / output 형식)
-    │
-    ▼
-LoRA 어댑터 학습
-(Base 모델: Qwen2.5 / Llama 3)
-    │
-    ▼
-검증 및 평가 (ROUGE, BERTScore)
-    │
-    ▼
-어댑터 병합 및 배포
-    │
-    ▼
-회의록 특화 모델 서빙 (Ollama)
-```
- 
-### 학습 데이터 구조
- 
-파인튜닝에 사용되는 데이터는 아래 형식으로 구성됩니다.
- 
-```json
-{
-  "instruction": "다음 회의 내용을 분석하여 요약, 결정사항, 할 일, 질문, 다음 안건을 정리해주세요.",
-  "input": "오늘 회의에서는 로그인 기능 구현 방향을 논의했습니다. JWT 방식을 사용하기로 결정했고...",
-  "output": "## 회의 요약\n- 로그인 기능 구현 방향 논의\n\n## 결정사항\n- JWT 인증 방식 사용\n..."
-}
-```
- 
-### 사용 기술
- 
-| 기술 | 설명 |
-|------|------|
-| [PEFT](https://github.com/huggingface/peft) | HuggingFace LoRA 학습 라이브러리 |
-| [TRL](https://github.com/huggingface/trl) | SFT (Supervised Fine-Tuning) 트레이너 |
-| [bitsandbytes](https://github.com/TimDettmers/bitsandbytes) | 4-bit / 8-bit 양자화로 메모리 절감 |
-| Qwen2.5 / Llama 3 | 파인튜닝 베이스 모델 |
-| Ollama | 파인튜닝된 모델 로컬 서빙 |
- 
+| `spring.datasource.url` | MySQL 접속 URL |
+| `spring.datasource.username` | DB 사용자명 |
+| `spring.datasource.password` | DB 비밀번호 |
+| `jwt.secret` | JWT 서명 키 |
