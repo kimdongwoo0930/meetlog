@@ -1,0 +1,60 @@
+services:
+  ai-server:
+    build:
+      context: ./ai-server
+    container_name: meetlog-ai
+    expose:
+      - "8101"
+    environment:
+      WHISPER_MODEL: ${WHISPER_MODEL:-medium}
+      PORT: 8101
+    volumes:
+      - whisper-cache:/root/.cache/huggingface
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    container_name: meetlog-backend
+    expose:
+      - "8100"
+    environment:
+      SERVER_PORT: 8100
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/meetlog?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      AI_SERVER_URL: http://meetlog-ai:8101
+      JWT_SECRET: ${JWT_SECRET}
+    networks:
+      - proxy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: https://meetlog.dong02.com
+        NEXT_PUBLIC_AI_URL: https://meetlog.dong02.com
+    container_name: meetlog
+    expose:
+      - "3001"
+    environment:
+      PORT: 3001
+    depends_on:
+      - backend
+    networks:
+      - proxy
+    restart: unless-stopped
+
+networks:
+  proxy:
+    external: true
+    name: proxy
+
+volumes:
+  whisper-cache:

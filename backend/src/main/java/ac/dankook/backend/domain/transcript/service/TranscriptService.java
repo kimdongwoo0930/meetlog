@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -40,7 +41,7 @@ public class TranscriptService {
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public TranscriptSegmentDto saveAndBroadcast(Long meetingId, SaveSegmentRequest request) {
         User currentUser = getCurrentUser();
         Meeting meeting = meetingRepository.findById(meetingId)
@@ -67,6 +68,21 @@ public class TranscriptService {
         );
         broadcastService.broadcast(meetingId, dto);
         return dto;
+    }
+
+    @Transactional(readOnly = true)
+    public List<TranscriptSegmentDto> getActiveTranscripts(Long meetingId) {
+        String key = KEY_PREFIX + meetingId;
+        List<String> cached = redisTemplate.opsForList().range(key, 0, -1);
+        if (cached == null || cached.isEmpty()) return List.of();
+
+        List<TranscriptSegmentDto> result = new ArrayList<>();
+        long baseId = System.currentTimeMillis();
+        for (int i = 0; i < cached.size(); i++) {
+            TranscriptSegmentDto dto = deserializeToDto(cached.get(i), baseId + i);
+            if (dto != null) result.add(dto);
+        }
+        return result;
     }
 
     /** 회의 종료 시 Redis → DB 일괄 저장. MeetingService에서 호출. */
@@ -108,6 +124,23 @@ public class TranscriptService {
                     .startTime(req.startTime())
                     .endTime(req.endTime())
                     .build());
+        }
+    }
+
+    private TranscriptSegmentDto deserializeToDto(String json, long id) {
+        try {
+            JsonNode node = objectMapper.readTree(json);
+            return new TranscriptSegmentDto(
+                    id,
+                    node.get("speaker").asText(),
+                    node.get("content").asText(),
+                    node.get("startTime").asDouble(),
+                    node.get("endTime").asDouble(),
+                    LocalDateTime.parse(node.get("createdAt").asText())
+            );
+        } catch (Exception e) {
+            log.error("DTO 역직렬화 실패: {}", json, e);
+            return null;
         }
     }
 

@@ -123,6 +123,8 @@ export const meetingsApi = {
     }),
   saveSegment: (id: string | number, segment: { speaker: string; content: string; startTime: number; endTime: number }) =>
     request<void>(`/api/meetings/${id}/segments`, { method: "POST", body: JSON.stringify(segment) }),
+  getSegments: (id: string | number) =>
+    request<{ id: number; speaker: string; content: string; startTime: number; endTime: number; createdAt: string }[]>(`/api/meetings/${id}/segments`),
   getMinutes: (id: string) => request<MeetingMinutes>(`/api/meetings/${id}/minutes`),
   getTodos: (id: string) =>
     request<{ id: string; text: string; assignee: string; done: boolean }[]>(

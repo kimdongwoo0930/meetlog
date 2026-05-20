@@ -5,7 +5,18 @@ import SockJS from 'sockjs-client';
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
 
 const STUN_CONFIG: RTCConfiguration = {
-  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    {
+      urls: [
+        'turn:211.58.5.66:3478',
+        'turn:211.58.5.66:3478?transport=tcp',
+      ],
+      username: 'meetlog',
+      credential: 'ehddn0930',
+    },
+  ],
 };
 
 export type RemoteStream = {
@@ -53,6 +64,7 @@ export function useWebRTC(meetingId: string, myId: string) {
     // ICE candidate 수집 → 시그널링 서버로 전송
     pc.onicecandidate = (event) => {
       if (!event.candidate) return;
+      console.log(`[ICE] ${myId} → ${peerId}:`, event.candidate.type, event.candidate.address);
       stompRef.current?.publish({
         destination: `/app/meetings/${meetingId}/signal`,
         body: JSON.stringify({
@@ -64,13 +76,27 @@ export function useWebRTC(meetingId: string, myId: string) {
       });
     };
 
+    pc.onicegatheringstatechange = () => {
+      console.log(`[ICE gathering] ${peerId}:`, pc.iceGatheringState);
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log(`[ICE connection] ${peerId}:`, pc.iceConnectionState);
+      if (pc.iceConnectionState === 'failed') {
+        console.warn(`[ICE] ${peerId} failed — restartIce 시도`);
+        pc.restartIce();
+      }
+    };
+
     pc.onconnectionstatechange = () => {
+      console.log(`[PeerConnection] ${peerId}:`, pc.connectionState);
       if (pc.connectionState === 'connected') {
-        // 트랙 없어도 연결되면 그리드에 표시
         setRemoteStreams(prev =>
           prev.find(r => r.peerId === peerId) ? prev : [...prev, { peerId, stream: null }]
         );
-      } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+      } else if (pc.connectionState === 'failed') {
+        // disconnected는 일시적일 수 있으므로 failed만 정리
+        console.warn(`[PeerConnection] ${peerId} failed — 연결 종료`);
         setRemoteStreams(prev => prev.filter(r => r.peerId !== peerId));
         peerConnections.current.delete(peerId);
       }

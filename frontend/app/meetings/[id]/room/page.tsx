@@ -76,7 +76,7 @@ function VideoTile({ label, isMe, isMuted, isCameraOff, videoRef, muted }: {
   );
 }
 
-function RemoteVideoTile({ peerId, stream }: { peerId: string; stream: MediaStream | null }) {
+function RemoteVideoTile({ peerId, stream, isMuted }: { peerId: string; stream: MediaStream | null; isMuted?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasVideo, setHasVideo] = useState(false);
 
@@ -123,8 +123,18 @@ function RemoteVideoTile({ peerId, stream }: { peerId: string; stream: MediaStre
           <div style={{ fontSize: 13, fontWeight: 500, color: DARK.textSecondary }}>{shortId}</div>
         </>
       )}
-      <div style={{ position: "absolute", bottom: 10, left: 12, fontSize: 12.5, fontWeight: 500, color: "#fff", background: "rgba(0,0,0,0.45)", padding: "3px 8px", borderRadius: 5, backdropFilter: "blur(4px)" }}>
-        {shortId}
+      <div style={{ position: "absolute", bottom: 10, left: 12, right: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ fontSize: 12.5, fontWeight: 500, color: "#fff", background: "rgba(0,0,0,0.45)", padding: "3px 8px", borderRadius: 5, backdropFilter: "blur(4px)" }}>
+          {shortId}
+        </div>
+        {isMuted && (
+          <div style={{ width: 22, height: 22, borderRadius: 5, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg viewBox="0 0 12 12" fill="none" width="11" height="11" style={{ color: DARK.red }}>
+              <path d="M6 1a2 2 0 0 1 2 2v3a2 2 0 0 1-4 0V3a2 2 0 0 1 2-2z" stroke="currentColor" strokeWidth="1.2"/>
+              <line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" strokeWidth="1.2"/>
+            </svg>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -169,11 +179,16 @@ export default function MeetingRoomPage() {
   const [transcripts, setTranscripts] = useState<TranscriptItem[]>([]);
   const [isConnected, setIsConnected] = useState(false);
 
+  useEffect(() => {
+    meetingsApi.getSegments(id).then(data => setTranscripts(data as TranscriptItem[])).catch(() => {});
+  }, [id]);
+
   // 음성인식 상태
   const [isListening, setIsListening] = useState(false);
 
   // 참여자 목록
   const [participants, setParticipants] = useState<UserSummary[]>([]);
+  const [remoteMutes, setRemoteMutes] = useState<Record<string, boolean>>({});
 
   // 참여자 초대
   const [inviteEmail, setInviteEmail] = useState("");
@@ -284,6 +299,8 @@ export default function MeetingRoomPage() {
           const signal = JSON.parse(message.body);
           if (signal.type === 'meeting-ended') {
             router.push(`/meetings/${id}`);
+          } else if (signal.type === 'mute') {
+            setRemoteMutes(prev => ({ ...prev, [signal.from]: signal.muted }));
           }
         });
       },
@@ -433,6 +450,11 @@ export default function MeetingRoomPage() {
 
   const handleToggleMic = () => {
     toggleMic();
+    const newMuted = !isMuted;
+    stompRef.current?.publish({
+      destination: `/app/meetings/${id}/signal`,
+      body: JSON.stringify({ type: 'mute', from: myId, muted: newMuted }),
+    });
     if (!isMuted) {
       stopRecording();
       sessionStorage.setItem(MIC_KEY, 'true');
@@ -502,7 +524,7 @@ export default function MeetingRoomPage() {
             background: DARK.surface2, border: `1px solid ${DARK.border}`, padding: "4px 10px", borderRadius: 6,
           }}>
             <svg viewBox="0 0 13 13" fill="none" width="13" height="13"><circle cx="5" cy="4.5" r="2" stroke="currentColor" strokeWidth="1.2"/><path d="M1.5 11c0-2 1.6-3.5 3.5-3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><circle cx="9.5" cy="4.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M8.5 11c0-1.7 1-3 2.5-3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-            5명 참여 중
+            {participants.length}명 참여 중
           </div>
           {isHost ? (
             <button
@@ -548,7 +570,7 @@ export default function MeetingRoomPage() {
             />
             {/* 원격 참여자 */}
             {remoteStreams.map(({ peerId, stream }) => (
-              <RemoteVideoTile key={peerId} peerId={peerId} stream={stream} />
+              <RemoteVideoTile key={peerId} peerId={peerId} stream={stream} isMuted={remoteMutes[peerId] ?? false} />
             ))}
             {/* 빈 슬롯 */}
             {Array.from({ length: Math.max(0, 5 - remoteStreams.length) }).map((_, i) => (
@@ -684,9 +706,11 @@ export default function MeetingRoomPage() {
                           display: "flex", alignItems: "center", justifyContent: "center",
                           fontSize: 9, fontWeight: 700, color: "#fff", flexShrink: 0,
                         }}>
-                          {item.speaker.slice(0, 1)}
+                          {(participants.find(p => p.email === item.speaker)?.name ?? item.speaker).slice(0, 1)}
                         </div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: DARK.textPrimary }}>{item.speaker}</div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: DARK.textPrimary }}>
+                          {participants.find(p => p.email === item.speaker)?.name ?? item.speaker.split('@')[0]}
+                        </div>
                         <div style={{ fontSize: 11, color: DARK.textTertiary, marginLeft: "auto" }}>
                           {formatSeconds(item.startTime)}
                         </div>
