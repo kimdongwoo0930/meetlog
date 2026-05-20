@@ -207,7 +207,7 @@ export default function MeetingRoomPage() {
     setEditingId(null);
   };
 
-  const handleDeleteItem = async (segmentId: number) => {
+  const handleDeleteItem = async (segmentId: string) => {
     try {
       await meetingsApi.deleteSegment(id, segmentId);
       setTranscripts(prev => prev.filter(t => t.id !== segmentId));
