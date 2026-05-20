@@ -150,14 +150,20 @@ export default function MeetingRoomPage() {
   const routeParams = useParams();
   const id = routeParams.id as string;
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'transcript' | 'ai' | 'participants'>('transcript');
+  const [activeTab, setActiveTab] = useState<'transcript' | 'chat' | 'participants'>('transcript');
   const [seconds, setSeconds] = useState(0);
   const [isMuted, setIsMuted] = useState(false); // restored from sessionStorage in useEffect
   const [isCameraOff, setIsCameraOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [hostEmail, setHostEmail] = useState<string | null>(null);
+  const [meetingTitle, setMeetingTitle] = useState("");
   const [ending, setEnding] = useState(false);
+  const [showPanel, setShowPanel] = useState(true);
+  const [panelWidth, setPanelWidth] = useState(320);
+  const isResizingRef = useRef(false);
+  const resizeStartXRef = useRef(0);
+  const resizeStartWidthRef = useRef(320);
 
   // WebRTC — useRef로 myId를 첫 클라이언트 렌더부터 고정 (재초기화 방지)
   const myIdRef = useRef(typeof window !== 'undefined' ? (localStorage.getItem('userEmail') ?? 'anonymous') : 'anonymous');
@@ -185,6 +191,16 @@ export default function MeetingRoomPage() {
 
   // 음성인식 상태
   const [isListening, setIsListening] = useState(false);
+
+  // 채팅
+  type ChatMessage = { id: string; from: string; name: string; text: string; time: string };
+  const CHAT_KEY = `meetingChat_${id}`;
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try { return JSON.parse(sessionStorage.getItem(`meetingChat_${id}`) ?? '[]'); } catch { return []; }
+  });
+  const [chatInput, setChatInput] = useState("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   // 자막 편집 상태
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -222,6 +238,46 @@ export default function MeetingRoomPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteResult, setInviteResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [inviting, setInviting] = useState(false);
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    resizeStartXRef.current = e.clientX;
+    resizeStartWidthRef.current = panelWidth;
+
+    const onMove = (ev: MouseEvent) => {
+      if (!isResizingRef.current) return;
+      const delta = resizeStartXRef.current - ev.clientX;
+      const next = Math.min(520, Math.max(240, resizeStartWidthRef.current + delta));
+      setPanelWidth(next);
+    };
+    const onUp = () => {
+      isResizingRef.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const handleSendChat = () => {
+    const text = chatInput.trim();
+    if (!text || !stompRef.current?.connected) return;
+    const myName = participants.find(p => p.email === myEmail)?.name ?? myEmail.split('@')[0];
+    const msg: ChatMessage = {
+      id: crypto.randomUUID(),
+      from: myEmail,
+      name: myName,
+      text,
+      time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+    };
+    stompRef.current.publish({
+      destination: `/app/meetings/${id}/signal`,
+      body: JSON.stringify({ type: 'chat', from: myEmail, to: null, payload: msg }),
+    });
+    setChatMessages(prev => [...prev, msg]);
+    setChatInput("");
+  };
 
   const handleInvite = async () => {
     const email = inviteEmail.trim();
@@ -268,6 +324,12 @@ export default function MeetingRoomPage() {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [transcripts]);
 
+  // 채팅 스크롤 + sessionStorage 저장
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    try { sessionStorage.setItem(CHAT_KEY, JSON.stringify(chatMessages)); } catch {}
+  }, [chatMessages]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 참여자 목록 로드 (초대 후에도 갱신)
   const loadParticipants = useCallback(() => {
     participantApi.list(id).then(setParticipants).catch(() => {});
@@ -309,6 +371,12 @@ export default function MeetingRoomPage() {
     // 호스트 여부 확인 (생성자 == 현재 유저)
     meetingsApi.get(id).then(meeting => {
       setHostEmail(meeting.hostUserEmail);
+      setMeetingTitle(meeting.title);
+      if (meeting.startedAt) {
+        const utc = meeting.startedAt.endsWith('Z') ? meeting.startedAt : meeting.startedAt + 'Z';
+        const elapsed = Math.floor((Date.now() - new Date(utc).getTime()) / 1000);
+        setSeconds(Math.max(0, elapsed));
+      }
       const myEmail = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
       if (myEmail && meeting.hostUserEmail === myEmail) setIsHost(true);
     }).catch(() => {});
@@ -335,6 +403,9 @@ export default function MeetingRoomPage() {
             router.push(`/meetings/${id}`);
           } else if (signal.type === 'mute') {
             setRemoteMutes(prev => ({ ...prev, [signal.from]: signal.muted }));
+          } else if (signal.type === 'chat') {
+            const incoming = signal.payload as ChatMessage;
+            setChatMessages(prev => prev.some(m => m.id === incoming.id) ? prev : [...prev, incoming]);
           }
         });
       },
@@ -528,7 +599,7 @@ export default function MeetingRoomPage() {
             Meet<span style={{ color: "#6b8cff" }}>Log</span>
           </div>
           <div style={{ width: 1, height: 18, background: DARK.border }} />
-          <div style={{ fontSize: 13.5, fontWeight: 500, color: DARK.textPrimary }}>AI 모델 파인튜닝 논의</div>
+          <div style={{ fontSize: 13.5, fontWeight: 500, color: DARK.textPrimary }}>{meetingTitle}</div>
           <div style={{
             display: "inline-flex", alignItems: "center", gap: 5,
             background: DARK.redDim, border: "1px solid rgba(239,68,68,0.25)",
@@ -558,7 +629,7 @@ export default function MeetingRoomPage() {
             background: DARK.surface2, border: `1px solid ${DARK.border}`, padding: "4px 10px", borderRadius: 6,
           }}>
             <svg viewBox="0 0 13 13" fill="none" width="13" height="13"><circle cx="5" cy="4.5" r="2" stroke="currentColor" strokeWidth="1.2"/><path d="M1.5 11c0-2 1.6-3.5 3.5-3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><circle cx="9.5" cy="4.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M8.5 11c0-1.7 1-3 2.5-3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-            {participants.length}명 참여 중
+            {1 + remoteStreams.length}명 참여 중
           </div>
           {isHost ? (
             <button
@@ -655,33 +726,72 @@ export default function MeetingRoomPage() {
             ))}
             <div style={{ width: 1, height: 32, background: DARK.border, margin: "0 4px" }} />
             {[
-              { label: "참여자", icon: <svg viewBox="0 0 18 18" fill="none" width="18" height="18"><circle cx="7" cy="6" r="3" stroke="currentColor" strokeWidth="1.4"/><path d="M1 16c0-3.3 2.7-6 6-6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><circle cx="13" cy="6" r="2" stroke="currentColor" strokeWidth="1.4"/><path d="M12 16c0-2.5 1.5-4.5 3.5-5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> },
-              { label: "채팅", icon: <svg viewBox="0 0 18 18" fill="none" width="18" height="18"><path d="M3 3h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6l-3 3V4a1 1 0 0 1 1-1z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg> },
+              { label: "참여자", tab: "participants" as const, icon: <svg viewBox="0 0 18 18" fill="none" width="18" height="18"><circle cx="7" cy="6" r="3" stroke="currentColor" strokeWidth="1.4"/><path d="M1 16c0-3.3 2.7-6 6-6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><circle cx="13" cy="6" r="2" stroke="currentColor" strokeWidth="1.4"/><path d="M12 16c0-2.5 1.5-4.5 3.5-5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> },
+              { label: "채팅", tab: "chat" as const, icon: <svg viewBox="0 0 18 18" fill="none" width="18" height="18"><path d="M3 3h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6l-3 3V4a1 1 0 0 1 1-1z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg> },
             ].map(btn => (
               <div key={btn.label} style={{ position: "relative" }}>
-                <button style={{
-                  width: 46, height: 46, borderRadius: 12,
-                  background: DARK.surface2, border: `1px solid ${DARK.border}`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: "pointer", color: DARK.textPrimary,
-                }}>{btn.icon}</button>
+                <button
+                  onClick={() => {
+                    if (showPanel && activeTab === btn.tab) {
+                      setShowPanel(false);
+                    } else {
+                      setActiveTab(btn.tab);
+                      setShowPanel(true);
+                    }
+                  }}
+                  style={{
+                    width: 46, height: 46, borderRadius: 12,
+                    background: showPanel && activeTab === btn.tab ? DARK.accentDim : DARK.surface2,
+                    border: `1px solid ${showPanel && activeTab === btn.tab ? DARK.accentBorder : DARK.border}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    cursor: "pointer", color: showPanel && activeTab === btn.tab ? DARK.accent : DARK.textPrimary,
+                  }}>{btn.icon}</button>
                 <span style={{ position: "absolute", bottom: -18, left: "50%", transform: "translateX(-50%)", fontSize: 10, color: DARK.textTertiary, whiteSpace: "nowrap" }}>{btn.label}</span>
               </div>
             ))}
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setShowPanel(v => !v)}
+                title={showPanel ? "패널 숨기기" : "패널 보기"}
+                style={{
+                  width: 46, height: 46, borderRadius: 12,
+                  background: showPanel ? DARK.accentDim : DARK.surface2,
+                  border: `1px solid ${showPanel ? DARK.accentBorder : DARK.border}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer", color: showPanel ? DARK.accent : DARK.textPrimary,
+                }}>
+                <svg viewBox="0 0 18 18" fill="none" width="18" height="18">
+                  <rect x="1" y="1" width="16" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.4"/>
+                  <line x1="11" y1="1" x2="11" y2="17" stroke="currentColor" strokeWidth="1.4"/>
+                </svg>
+              </button>
+              <span style={{ position: "absolute", bottom: -18, left: "50%", transform: "translateX(-50%)", fontSize: 10, color: DARK.textTertiary, whiteSpace: "nowrap" }}>패널</span>
+            </div>
           </div>
         </div>
 
         {/* RIGHT PANEL */}
-        <div style={{
-          width: 320, flexShrink: 0,
+        {showPanel && <div style={{
+          width: panelWidth, flexShrink: 0,
           background: DARK.surface, borderLeft: `1px solid ${DARK.border}`,
-          display: "flex", flexDirection: "column",
+          display: "flex", flexDirection: "column", position: "relative",
         }}>
+          {/* 리사이즈 핸들 */}
+          <div
+            onMouseDown={handleResizeStart}
+            style={{
+              position: "absolute", left: 0, top: 0, bottom: 0, width: 4,
+              cursor: "col-resize", zIndex: 10,
+              background: "transparent",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = DARK.accentBorder)}
+            onMouseLeave={e => { if (!isResizingRef.current) e.currentTarget.style.background = "transparent"; }}
+          />
           {/* TABS */}
           <div style={{ display: "flex", borderBottom: `1px solid ${DARK.border}`, padding: "0 4px", flexShrink: 0 }}>
             {([
               { key: "transcript", label: "실시간 자막", badge: isConnected ? "Live" : null },
-              { key: "ai", label: "AI 분석", badge: null },
+              { key: "chat", label: "채팅", badge: null },
               { key: "participants", label: "참여자", badge: null },
             ] as const).map(tab => (
               <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
@@ -815,10 +925,54 @@ export default function MeetingRoomPage() {
               </div>
             )}
 
-            {activeTab === "ai" && (
-              <div style={{ padding: "14px 16px" }}>
-                <div style={{ textAlign: "center", color: DARK.textTertiary, fontSize: 13, padding: "32px 0" }}>
-                  회의 종료 후 AI 분석 결과가 표시됩니다
+            {activeTab === "chat" && (
+              <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+                <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+                  {chatMessages.length === 0 ? (
+                    <div style={{ textAlign: "center", color: DARK.textTertiary, fontSize: 13, padding: "32px 0" }}>
+                      채팅을 시작해보세요
+                    </div>
+                  ) : chatMessages.map(msg => {
+                    const isMe = msg.from === myEmail;
+                    return (
+                      <div key={msg.id} style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start", gap: 3 }}>
+                        {!isMe && <div style={{ fontSize: 11.5, fontWeight: 600, color: DARK.textTertiary, paddingLeft: 4 }}>{msg.name}</div>}
+                        <div style={{
+                          maxWidth: "80%", padding: "8px 12px", borderRadius: isMe ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
+                          background: isMe ? DARK.accent : DARK.surface2,
+                          border: `1px solid ${isMe ? "transparent" : DARK.border}`,
+                          fontSize: 13, color: isMe ? "#fff" : DARK.textPrimary, lineHeight: 1.55,
+                        }}>{msg.text}</div>
+                        <div style={{ fontSize: 10.5, color: DARK.textTertiary, paddingLeft: 4, paddingRight: 4 }}>{msg.time}</div>
+                      </div>
+                    );
+                  })}
+                  <div ref={chatEndRef} />
+                </div>
+                <div style={{ padding: "10px 12px", borderTop: `1px solid ${DARK.border}`, display: "flex", gap: 6 }}>
+                  <input
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSendChat()}
+                    placeholder="메시지 입력..."
+                    style={{
+                      flex: 1, padding: "8px 10px", borderRadius: 8,
+                      border: `1px solid ${DARK.border}`, background: DARK.surface2,
+                      color: DARK.textPrimary, fontSize: 13, outline: "none",
+                    }}
+                  />
+                  <button
+                    onClick={handleSendChat}
+                    disabled={!chatInput.trim()}
+                    style={{
+                      padding: "8px 12px", borderRadius: 8, border: "none",
+                      background: DARK.accent, color: "#fff", fontSize: 13,
+                      cursor: "pointer", opacity: chatInput.trim() ? 1 : 0.4, flexShrink: 0,
+                    }}>
+                    <svg viewBox="0 0 16 16" fill="none" width="15" height="15">
+                      <path d="M14 8L2 2l3 6-3 6 12-6z" fill="currentColor"/>
+                    </svg>
+                  </button>
                 </div>
               </div>
             )}
@@ -898,7 +1052,7 @@ export default function MeetingRoomPage() {
               </div>
             )}
           </div>
-        </div>
+        </div>}
       </div>
 
       <style>{`
