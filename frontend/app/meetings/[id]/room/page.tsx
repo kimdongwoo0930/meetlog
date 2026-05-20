@@ -319,8 +319,14 @@ export default function MeetingRoomPage() {
       onConnect: () => {
         setIsConnected(true);
         client.subscribe(`/topic/meetings/${id}/transcript`, (message) => {
-          const segment: TranscriptItem = JSON.parse(message.body);
-          setTranscripts(prev => [...prev, segment]);
+          const event = JSON.parse(message.body) as { action?: string; id: string; speaker?: string; content?: string; startTime?: number; endTime?: number; createdAt?: string };
+          if (event.action === 'update') {
+            setTranscripts(prev => prev.map(t => t.id === event.id ? { ...t, content: event.content ?? t.content } : t));
+          } else if (event.action === 'delete') {
+            setTranscripts(prev => prev.filter(t => t.id !== event.id));
+          } else {
+            setTranscripts(prev => [...prev, event as TranscriptItem]);
+          }
         });
         // 회의 종료 신호 수신
         client.subscribe(`/topic/meetings/${id}/signal`, (message) => {

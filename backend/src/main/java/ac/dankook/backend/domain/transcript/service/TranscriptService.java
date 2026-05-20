@@ -117,7 +117,8 @@ public class TranscriptService {
         for (int i = 0; i < list.size(); i++) {
             try {
                 JsonNode node = objectMapper.readTree(list.get(i));
-                if (!node.get("id").asText().equals(segmentId)) continue;
+                JsonNode idNode = node.get("id");
+                if (idNode == null || !idNode.asText().equals(segmentId)) continue;
 
                 String speaker = node.get("speaker").asText();
                 if (!speaker.equals(caller.getEmail()) && !meeting.isHost(caller)) {
@@ -133,6 +134,7 @@ public class TranscriptService {
                         "createdAt", node.get("createdAt").asText()
                 ));
                 redisTemplate.opsForList().set(key, i, updated);
+                broadcastService.broadcastUpdate(meetingId, segmentId, newContent);
                 return;
             } catch (CustomException e) {
                 throw e;
@@ -155,7 +157,8 @@ public class TranscriptService {
         for (String json : list) {
             try {
                 JsonNode node = objectMapper.readTree(json);
-                if (!node.get("id").asText().equals(segmentId)) continue;
+                JsonNode idNode = node.get("id");
+                if (idNode == null || !idNode.asText().equals(segmentId)) continue;
 
                 String speaker = node.get("speaker").asText();
                 if (!speaker.equals(caller.getEmail()) && !meeting.isHost(caller)) {
@@ -163,6 +166,7 @@ public class TranscriptService {
                 }
 
                 redisTemplate.opsForList().remove(key, 1, json);
+                broadcastService.broadcastDelete(meetingId, segmentId);
                 return;
             } catch (CustomException e) {
                 throw e;
