@@ -13,6 +13,7 @@ public enum ErrorCode {
     MEETING_FORBIDDEN(HttpStatus.FORBIDDEN, "MEETING_FORBIDDEN", "회의에 접근할 권한이 없습니다."),
     MEETING_INVALID_STATUS_TRANSITION(HttpStatus.BAD_REQUEST, "MEETING_INVALID_STATUS_TRANSITION", "잘못된 회의 상태 전이입니다."),
     TODO_NOT_FOUND(HttpStatus.NOT_FOUND, "TODO_NOT_FOUND", "할 일을 찾을 수 없습니다."),
+    SEGMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "SEGMENT_NOT_FOUND", "자막 세그먼트를 찾을 수 없습니다."),
     NOT_IMPLEMENTED(HttpStatus.NOT_IMPLEMENTED, "NOT_IMPLEMENTED", "기능이 아직 구현되지 않았습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "서버 오류가 발생했습니다.");
 

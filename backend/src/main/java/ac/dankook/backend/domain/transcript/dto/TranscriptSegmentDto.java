@@ -5,7 +5,7 @@ import ac.dankook.backend.domain.transcript.entity.TranscriptSegment;
 import java.time.LocalDateTime;
 
 public record TranscriptSegmentDto(
-        Long id,
+        String id,
         String speaker,
         String content,
         Double startTime,
@@ -14,7 +14,7 @@ public record TranscriptSegmentDto(
 ) {
     public static TranscriptSegmentDto from(TranscriptSegment segment) {
         return new TranscriptSegmentDto(
-                segment.getId(),
+                segment.getId().toString(),
                 segment.getSpeaker(),
                 segment.getContent(),
                 segment.getStartTime(),

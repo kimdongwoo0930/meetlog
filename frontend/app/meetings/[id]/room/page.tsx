@@ -9,7 +9,7 @@ import { participantApi, meetingsApi, type UserSummary } from '@/src/lib/api';
 import { useRouter, useParams } from 'next/navigation';
 
 type TranscriptItem = {
-  id: number;
+  id: string;
   speaker: string;
   content: string;
   startTime: number;
@@ -185,6 +185,34 @@ export default function MeetingRoomPage() {
 
   // 음성인식 상태
   const [isListening, setIsListening] = useState(false);
+
+  // 자막 편집 상태
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editContent, setEditContent] = useState("");
+
+  const canEditItem = (item: TranscriptItem) => isHost || item.speaker === myEmail;
+
+  const handleEditStart = (item: TranscriptItem) => {
+    setEditingId(item.id);
+    setEditContent(item.content);
+  };
+
+  const handleEditSave = async (item: TranscriptItem) => {
+    const trimmed = editContent.trim();
+    if (!trimmed || trimmed === item.content) { setEditingId(null); return; }
+    try {
+      await meetingsApi.updateSegment(id, item.id, trimmed);
+      setTranscripts(prev => prev.map(t => t.id === item.id ? { ...t, content: trimmed } : t));
+    } catch { /* 실패 시 원복 */ }
+    setEditingId(null);
+  };
+
+  const handleDeleteItem = async (segmentId: number) => {
+    try {
+      await meetingsApi.deleteSegment(id, segmentId);
+      setTranscripts(prev => prev.filter(t => t.id !== segmentId));
+    } catch { /* 실패 시 유지 */ }
+  };
 
   // 참여자 목록
   const [participants, setParticipants] = useState<UserSummary[]>([]);
@@ -697,29 +725,85 @@ export default function MeetingRoomPage() {
                     아직 자막이 없습니다
                   </div>
                 ) : (
-                  transcripts.map((item) => (
-                    <div key={item.id} style={{ marginBottom: 14 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
-                        <div style={{
-                          width: 20, height: 20, borderRadius: "50%",
-                          background: "linear-gradient(135deg,#2563eb,#4f46e5)",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 9, fontWeight: 700, color: "#fff", flexShrink: 0,
-                        }}>
-                          {(participants.find(p => p.email === item.speaker)?.name ?? item.speaker).slice(0, 1)}
+                  transcripts.map((item) => {
+                    const speakerName = participants.find(p => p.email === item.speaker)?.name ?? item.speaker.split('@')[0];
+                    const isEditing = editingId === item.id;
+                    const canEdit = canEditItem(item);
+                    return (
+                      <div key={item.id} style={{ marginBottom: 14, position: "relative" }}
+                        onMouseEnter={e => { if (canEdit && !isEditing) (e.currentTarget.querySelector('.transcript-actions') as HTMLElement | null)?.style && ((e.currentTarget.querySelector('.transcript-actions') as HTMLElement).style.opacity = '1'); }}
+                        onMouseLeave={e => { (e.currentTarget.querySelector('.transcript-actions') as HTMLElement | null)?.style && ((e.currentTarget.querySelector('.transcript-actions') as HTMLElement).style.opacity = '0'); }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
+                          <div style={{
+                            width: 20, height: 20, borderRadius: "50%",
+                            background: "linear-gradient(135deg,#2563eb,#4f46e5)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 9, fontWeight: 700, color: "#fff", flexShrink: 0,
+                          }}>
+                            {speakerName.slice(0, 1)}
+                          </div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: DARK.textPrimary }}>{speakerName}</div>
+                          <div style={{ fontSize: 11, color: DARK.textTertiary, marginLeft: "auto" }}>
+                            {formatSeconds(item.startTime)}
+                          </div>
+                          {canEdit && !isEditing && (
+                            <div className="transcript-actions" style={{ display: "flex", gap: 4, opacity: 0, transition: "opacity 0.15s" }}>
+                              <button
+                                onClick={() => handleEditStart(item)}
+                                title="수정"
+                                style={{ background: "none", border: "none", cursor: "pointer", color: DARK.textTertiary, padding: "2px 4px", borderRadius: 4, lineHeight: 1 }}
+                              >
+                                <svg viewBox="0 0 12 12" fill="none" width="12" height="12">
+                                  <path d="M8 2l2 2-6 6H2v-2L8 2z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteItem(item.id)}
+                                title="삭제"
+                                style={{ background: "none", border: "none", cursor: "pointer", color: DARK.red, padding: "2px 4px", borderRadius: 4, lineHeight: 1 }}
+                              >
+                                <svg viewBox="0 0 12 12" fill="none" width="12" height="12">
+                                  <path d="M2 3h8M5 3V2h2v1M4 3v6h4V3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              </button>
+                            </div>
+                          )}
                         </div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: DARK.textPrimary }}>
-                          {participants.find(p => p.email === item.speaker)?.name ?? item.speaker.split('@')[0]}
-                        </div>
-                        <div style={{ fontSize: 11, color: DARK.textTertiary, marginLeft: "auto" }}>
-                          {formatSeconds(item.startTime)}
-                        </div>
+                        {isEditing ? (
+                          <div style={{ paddingLeft: 27, display: "flex", flexDirection: "column", gap: 6 }}>
+                            <textarea
+                              value={editContent}
+                              onChange={e => setEditContent(e.target.value)}
+                              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEditSave(item); } if (e.key === "Escape") setEditingId(null); }}
+                              autoFocus
+                              rows={2}
+                              style={{
+                                width: "100%", padding: "6px 8px", borderRadius: 6,
+                                border: `1px solid ${DARK.accentBorder}`, background: DARK.surface2,
+                                color: DARK.textPrimary, fontSize: 13, resize: "none",
+                                outline: "none", lineHeight: 1.6, boxSizing: "border-box",
+                              }}
+                            />
+                            <div style={{ display: "flex", gap: 5 }}>
+                              <button
+                                onClick={() => handleEditSave(item)}
+                                style={{ padding: "4px 10px", borderRadius: 5, border: "none", background: DARK.accent, color: "#fff", fontSize: 11.5, fontWeight: 500, cursor: "pointer" }}
+                              >저장</button>
+                              <button
+                                onClick={() => setEditingId(null)}
+                                style={{ padding: "4px 10px", borderRadius: 5, border: `1px solid ${DARK.border}`, background: "transparent", color: DARK.textSecondary, fontSize: 11.5, cursor: "pointer" }}
+                              >취소</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 13, color: DARK.textSecondary, lineHeight: 1.65, paddingLeft: 27 }}>
+                            {item.content}
+                          </div>
+                        )}
                       </div>
-                      <div style={{ fontSize: 13, color: DARK.textSecondary, lineHeight: 1.65, paddingLeft: 27 }}>
-                        {item.content}
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
                 <div ref={transcriptEndRef} />
               </div>

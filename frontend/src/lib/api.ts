@@ -124,7 +124,11 @@ export const meetingsApi = {
   saveSegment: (id: string | number, segment: { speaker: string; content: string; startTime: number; endTime: number }) =>
     request<void>(`/api/meetings/${id}/segments`, { method: "POST", body: JSON.stringify(segment) }),
   getSegments: (id: string | number) =>
-    request<{ id: number; speaker: string; content: string; startTime: number; endTime: number; createdAt: string }[]>(`/api/meetings/${id}/segments`),
+    request<{ id: string; speaker: string; content: string; startTime: number; endTime: number; createdAt: string }[]>(`/api/meetings/${id}/segments`),
+  updateSegment: (meetingId: string | number, segmentId: string, content: string) =>
+    request<void>(`/api/meetings/${meetingId}/segments/${segmentId}`, { method: "PATCH", body: JSON.stringify({ content }) }),
+  deleteSegment: (meetingId: string | number, segmentId: string) =>
+    request<void>(`/api/meetings/${meetingId}/segments/${segmentId}`, { method: "DELETE" }),
   getMinutes: (id: string) => request<MeetingMinutes>(`/api/meetings/${id}/minutes`),
   getTodos: (id: string) =>
     request<{ id: string; text: string; assignee: string; done: boolean }[]>(

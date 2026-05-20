@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -56,10 +57,10 @@ public class TranscriptService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        pushToRedis(meetingId, request, now);
+        String segmentId = pushToRedis(meetingId, request, now);
 
         TranscriptSegmentDto dto = new TranscriptSegmentDto(
-                System.currentTimeMillis(),
+                segmentId,
                 request.speaker(),
                 request.content(),
                 request.startTime(),
@@ -102,9 +103,92 @@ public class TranscriptService {
         log.info("meeting={} 세그먼트 {}건 DB 저장 완료", meeting.getId(), segments.size());
     }
 
-    private void pushToRedis(Long meetingId, SaveSegmentRequest req, LocalDateTime now) {
+
+
+    public void updateSegment(Long meetingId, String segmentId, String newContent) {
+        User caller = getCurrentUser();
+        Meeting meeting = meetingRepository.findById(meetingId)
+                .orElseThrow(() -> new CustomException(ErrorCode.MEETING_NOT_FOUND));
+
+        String key = KEY_PREFIX + meetingId;
+        List<String> list = redisTemplate.opsForList().range(key, 0, -1);
+        if (list == null) throw new CustomException(ErrorCode.SEGMENT_NOT_FOUND);
+
+        for (int i = 0; i < list.size(); i++) {
+            try {
+                JsonNode node = objectMapper.readTree(list.get(i));
+                if (!node.get("id").asText().equals(segmentId)) continue;
+
+                String speaker = node.get("speaker").asText();
+                if (!speaker.equals(caller.getEmail()) && !meeting.isHost(caller)) {
+                    throw new CustomException(ErrorCode.MEETING_FORBIDDEN);
+                }
+
+                String updated = objectMapper.writeValueAsString(Map.of(
+                        "id", segmentId,
+                        "speaker", speaker,
+                        "content", newContent,
+                        "startTime", node.get("startTime").asDouble(),
+                        "endTime", node.get("endTime").asDouble(),
+                        "createdAt", node.get("createdAt").asText()
+                ));
+                redisTemplate.opsForList().set(key, i, updated);
+                return;
+            } catch (CustomException e) {
+                throw e;
+            } catch (Exception e) {
+                log.error("세그먼트 수정 중 역직렬화 실패: {}", list.get(i), e);
+            }
+        }
+        throw new CustomException(ErrorCode.SEGMENT_NOT_FOUND);
+    }
+
+    public void deleteSegment(Long meetingId, String segmentId) {
+        User caller = getCurrentUser();
+        Meeting meeting = meetingRepository.findById(meetingId)
+                .orElseThrow(() -> new CustomException(ErrorCode.MEETING_NOT_FOUND));
+
+        String key = KEY_PREFIX + meetingId;
+        List<String> list = redisTemplate.opsForList().range(key, 0, -1);
+        if (list == null) throw new CustomException(ErrorCode.SEGMENT_NOT_FOUND);
+
+        for (String json : list) {
+            try {
+                JsonNode node = objectMapper.readTree(json);
+                if (!node.get("id").asText().equals(segmentId)) continue;
+
+                String speaker = node.get("speaker").asText();
+                if (!speaker.equals(caller.getEmail()) && !meeting.isHost(caller)) {
+                    throw new CustomException(ErrorCode.MEETING_FORBIDDEN);
+                }
+
+                redisTemplate.opsForList().remove(key, 1, json);
+                return;
+            } catch (CustomException e) {
+                throw e;
+            } catch (Exception e) {
+                log.error("세그먼트 삭제 중 역직렬화 실패: {}", json, e);
+            }
+        }
+        throw new CustomException(ErrorCode.SEGMENT_NOT_FOUND);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+    private String pushToRedis(Long meetingId, SaveSegmentRequest req, LocalDateTime now) {
+        String id = UUID.randomUUID().toString();
         try {
             String json = objectMapper.writeValueAsString(Map.of(
+                    "id", id,
                     "speaker", req.speaker(),
                     "content", req.content(),
                     "startTime", req.startTime(),
@@ -125,11 +209,13 @@ public class TranscriptService {
                     .endTime(req.endTime())
                     .build());
         }
+        return id;
     }
 
-    private TranscriptSegmentDto deserializeToDto(String json, long id) {
+    private TranscriptSegmentDto deserializeToDto(String json, long fallbackId) {
         try {
             JsonNode node = objectMapper.readTree(json);
+            String id = node.has("id") ? node.get("id").asText() : String.valueOf(fallbackId);
             return new TranscriptSegmentDto(
                     id,
                     node.get("speaker").asText(),
