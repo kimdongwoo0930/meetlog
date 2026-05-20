@@ -78,7 +78,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 50,
       }}>
         <div style={{ padding: "18px 20px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-          <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 18, color: "#fff" }}>
+          <div style={{ fontFamily: "'Pretendard Variable', Pretendard, sans-serif", fontSize: 18, color: "#fff" }}>
             Meet<span style={{ color: "#6b8cff" }}>Log</span>
           </div>
         </div>

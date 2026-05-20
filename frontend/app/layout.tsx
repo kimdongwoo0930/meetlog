@@ -1,13 +1,5 @@
 import type { Metadata } from "next";
-import { Instrument_Serif } from "next/font/google";
 import "./globals.css";
-
-const instrumentSerif = Instrument_Serif({
-  weight: ["400"],
-  style: ["normal", "italic"],
-  subsets: ["latin"],
-  variable: "--font-instrument-serif",
-});
 
 export const metadata: Metadata = {
   title: "MeetLog — AI 회의록 플랫폼",
@@ -20,7 +12,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className={instrumentSerif.variable} data-scroll-behavior="smooth">
+    <html lang="ko" data-scroll-behavior="smooth">
       <head>
         <link
           rel="stylesheet"

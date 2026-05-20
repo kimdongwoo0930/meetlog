@@ -121,6 +121,8 @@ export const meetingsApi = {
       method: "PATCH",
       body: JSON.stringify({ status }),
     }),
+  saveSegment: (id: string | number, segment: { speaker: string; content: string; startTime: number; endTime: number }) =>
+    request<void>(`/api/meetings/${id}/segments`, { method: "POST", body: JSON.stringify(segment) }),
   getMinutes: (id: string) => request<MeetingMinutes>(`/api/meetings/${id}/minutes`),
   getTodos: (id: string) =>
     request<{ id: string; text: string; assignee: string; done: boolean }[]>(

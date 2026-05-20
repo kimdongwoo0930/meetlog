@@ -45,7 +45,7 @@ export default function LoginPage() {
       padding: "2rem",
     }}>
       <Link href="/" style={{
-        fontFamily: "var(--font-instrument-serif), serif",
+        fontFamily: "'Pretendard Variable', Pretendard, sans-serif",
         fontSize: 24, color: "var(--text-primary)", textDecoration: "none",
         marginBottom: "2.5rem",
       }}>

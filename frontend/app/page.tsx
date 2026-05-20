@@ -1,15 +1,30 @@
 'use client';
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import AuthModal from "@/src/components/AuthModal";
+import { useRouter } from "next/navigation";
+import { authApi } from "@/src/lib/api";
 
 export default function LandingPage() {
-  const [modalTab, setModalTab] = useState<'login' | 'signup' | null>(null);
+  const router = useRouter();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  const openLogin = () => setModalTab('login');
-  const openSignup = () => setModalTab('signup');
-  const closeModal = () => setModalTab(null);
+  useEffect(() => {
+    setIsLoggedIn(!!localStorage.getItem("access_token"));
+  }, []);
+
+  const handleStartMeeting = () => {
+    if (isLoggedIn) {
+      router.push("/meetings/new");
+    } else {
+      router.push("/login");
+    }
+  };
+
+  const handleLogout = () => {
+    authApi.logout();
+    setIsLoggedIn(false);
+  };
 
   return (
     <div style={{ background: "var(--bg)", color: "var(--text-primary)", fontSize: 15, lineHeight: 1.6 }}>
@@ -22,17 +37,29 @@ export default function LandingPage() {
       }}>
         <div style={{
           display: "flex", alignItems: "center", gap: 8,
-          fontFamily: "var(--font-instrument-serif), serif",
+          fontFamily: "'Pretendard Variable', Pretendard, sans-serif",
           fontSize: 20, color: "var(--text-primary)",
         }}>
           Meet<span style={{ color: "var(--accent)" }}>Log</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Link href="#features" style={{ fontSize: 13.5, color: "var(--text-secondary)", textDecoration: "none", padding: "6px 12px", borderRadius: 6 }}>기능</Link>
-          <Link href="#how" style={{ fontSize: 13.5, color: "var(--text-secondary)", textDecoration: "none", padding: "6px 12px", borderRadius: 6 }}>작동 방식</Link>
-          <a href="https://github.com/kimdongwoo0930" target="_blank" rel="noopener noreferrer" style={{ fontSize: 13.5, color: "var(--text-secondary)", textDecoration: "none", padding: "6px 12px", borderRadius: 6 }}>GitHub</a>
-          <button onClick={openLogin} style={{ fontSize: 13.5, color: "var(--text-secondary)", background: "transparent", border: "1px solid var(--border)", padding: "6px 12px", borderRadius: 6, cursor: "pointer" }}>로그인</button>
-          <button onClick={openSignup} style={{ fontSize: 13.5, fontWeight: 500, color: "#fff", background: "var(--text-primary)", padding: "7px 16px", borderRadius: 7, border: "none", cursor: "pointer" }}>시작하기</button>
+          {isLoggedIn ? (
+            <button
+              onClick={handleLogout}
+              style={{ fontSize: 13.5, color: "var(--text-secondary)", background: "transparent", border: "1px solid var(--border)", padding: "6px 12px", borderRadius: 6, cursor: "pointer" }}
+            >
+              로그아웃
+            </button>
+          ) : (
+            <>
+              <Link href="/login" style={{ fontSize: 13.5, color: "var(--text-secondary)", background: "transparent", border: "1px solid var(--border)", padding: "6px 12px", borderRadius: 6, cursor: "pointer", textDecoration: "none" }}>
+                로그인
+              </Link>
+              <Link href="/signup" style={{ fontSize: 13.5, fontWeight: 500, color: "#fff", background: "var(--text-primary)", padding: "7px 16px", borderRadius: 7, border: "none", cursor: "pointer", textDecoration: "none" }}>
+                시작하기
+              </Link>
+            </>
+          )}
         </div>
       </nav>
 
@@ -62,7 +89,7 @@ export default function LandingPage() {
         </div>
 
         <h1 style={{
-          fontFamily: "var(--font-instrument-serif), serif",
+          fontFamily: "'Pretendard Variable', Pretendard, sans-serif",
           fontSize: "clamp(42px, 7vw, 76px)", lineHeight: 1.08,
           letterSpacing: "-0.02em", color: "var(--text-primary)",
           maxWidth: 760, animation: "fadeUp 0.5s 0.1s ease both",
@@ -81,20 +108,25 @@ export default function LandingPage() {
           marginTop: "2.5rem", display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap",
           animation: "fadeUp 0.5s 0.3s ease both",
         }}>
-          <button onClick={openSignup} style={{
+          <button onClick={handleStartMeeting} style={{
             background: "var(--text-primary)", color: "#fff",
             fontSize: 14, fontWeight: 500, padding: "11px 24px", borderRadius: 8,
             border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6,
           }}>
-            무료로 시작하기
+            회의 시작하기
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M8 4l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
-          <Link href="#how" style={{
-            background: "var(--surface)", color: "var(--text-primary)",
-            fontSize: 14, fontWeight: 500, padding: "11px 24px", borderRadius: 8,
-            textDecoration: "none", border: "1px solid var(--border)",
-            display: "inline-flex", alignItems: "center", gap: 6,
-          }}>작동 방식 보기</Link>
+          {isLoggedIn && (
+            <Link href="/meetings" style={{
+              background: "var(--surface)", color: "var(--text-primary)",
+              fontSize: 14, fontWeight: 500, padding: "11px 24px", borderRadius: 8,
+              border: "1px solid var(--border)", cursor: "pointer",
+              display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none",
+            }}>
+              회의 목록 보기
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M2 7h10M2 10h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            </Link>
+          )}
         </div>
 
         {/* DEMO CARD */}
@@ -167,20 +199,11 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* LOGOS */}
-      <div style={{ padding: "3rem 2rem", textAlign: "center", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}>
-        <div style={{ fontSize: 12, color: "var(--text-tertiary)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "1.5rem" }}>사용 기술</div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "3rem", flexWrap: "wrap" }}>
-          {["Next.js", "Spring Boot", "FastAPI", "Whisper", "Qwen2.5", "Docker"].map(tech => (
-            <span key={tech} style={{ fontSize: 14, fontWeight: 600, color: "var(--text-tertiary)", letterSpacing: "-0.01em" }}>{tech}</span>
-          ))}
-        </div>
-      </div>
 
       {/* FEATURES */}
       <section id="features" style={{ maxWidth: 1100, margin: "0 auto", padding: "6rem 2rem" }}>
         <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--accent)", marginBottom: "1rem" }}>주요 기능</div>
-        <h2 style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: "clamp(30px, 4vw, 44px)", lineHeight: 1.15, letterSpacing: "-0.02em", color: "var(--text-primary)", maxWidth: 520, marginBottom: "1rem" }}>회의의 모든 순간을<br />놓치지 않습니다</h2>
+        <h2 style={{ fontFamily: "'Pretendard Variable', Pretendard, sans-serif", fontSize: "clamp(30px, 4vw, 44px)", lineHeight: 1.15, letterSpacing: "-0.02em", color: "var(--text-primary)", maxWidth: 520, marginBottom: "1rem" }}>회의의 모든 순간을<br />놓치지 않습니다</h2>
         <p style={{ fontSize: 15.5, color: "var(--text-secondary)", maxWidth: 460, lineHeight: 1.7, marginBottom: "3rem" }}>실시간 음성 통신부터 AI 분석까지, 회의의 전 과정을 MeetLog가 처리합니다.</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1px", background: "var(--border)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
           {[
@@ -204,7 +227,7 @@ export default function LandingPage() {
       <section id="how" style={{ background: "var(--text-primary)", padding: "6rem 2rem" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6b8cff", marginBottom: "1rem" }}>작동 방식</div>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: "clamp(30px, 4vw, 44px)", lineHeight: 1.15, letterSpacing: "-0.02em", color: "#fff", maxWidth: 520, marginBottom: "1rem" }}>5단계로 완성되는<br />자동 회의록</h2>
+          <h2 style={{ fontFamily: "'Pretendard Variable', Pretendard, sans-serif", fontSize: "clamp(30px, 4vw, 44px)", lineHeight: 1.15, letterSpacing: "-0.02em", color: "#fff", maxWidth: 520, marginBottom: "1rem" }}>5단계로 완성되는<br />자동 회의록</h2>
           <p style={{ fontSize: 15.5, color: "rgba(255,255,255,0.55)", maxWidth: 460, lineHeight: 1.7, marginBottom: "3rem" }}>회의가 끝나면 AI가 자동으로 처리합니다. 별도의 작업이 필요 없습니다.</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", position: "relative" }}>
             <div style={{ position: "absolute", top: 20, left: "10%", right: "10%", height: 1, background: "rgba(255,255,255,0.1)" }} />
@@ -231,37 +254,9 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-
-      {/* STATS */}
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "6rem 2rem", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "2rem" }}>
-        {[
-          { num: "90%", label: "회의록 작성 시간 절감" },
-          { num: "<2분", label: "회의 종료 후 회의록 완성까지" },
-          { num: "100%", label: "로컬 LLM 기반 프라이버시 보장" },
-        ].map(stat => (
-          <div key={stat.label} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "2rem" }}>
-            <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 52, lineHeight: 1, marginBottom: "0.5rem" }}>
-              <span style={{ color: "var(--accent)" }}>{stat.num}</span>
-            </div>
-            <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>{stat.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* CTA */}
-      <section style={{ background: "var(--accent-light)", borderTop: "1px solid var(--accent-border)", borderBottom: "1px solid var(--accent-border)", padding: "6rem 2rem", textAlign: "center" }}>
-        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--accent)", marginBottom: "1rem" }}>지금 시작하세요</div>
-        <h2 style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: "clamp(30px, 4vw, 44px)", lineHeight: 1.15, letterSpacing: "-0.02em", color: "var(--text-primary)", maxWidth: 520, margin: "0 auto 1rem" }}>다음 회의부터<br />AI가 정리합니다</h2>
-        <p style={{ fontSize: 15.5, color: "var(--text-secondary)", maxWidth: 460, lineHeight: 1.7, margin: "0 auto 2.5rem" }}>회의 내용을 직접 정리하는 데 쓰던 시간을, 더 중요한 일에 집중하세요.</p>
-        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-          <button onClick={openSignup} style={{ background: "var(--text-primary)", color: "#fff", fontSize: 14, fontWeight: 500, padding: "11px 24px", borderRadius: 8, border: "none", cursor: "pointer" }}>무료로 시작하기 →</button>
-          <a href="https://github.com/kimdongwoo0930" target="_blank" rel="noopener noreferrer" style={{ background: "var(--surface)", color: "var(--text-primary)", fontSize: 14, fontWeight: 500, padding: "11px 24px", borderRadius: 8, textDecoration: "none", border: "1px solid var(--border)" }}>GitHub 보기</a>
-        </div>
-      </section>
-
       {/* FOOTER */}
       <footer style={{ maxWidth: 1100, margin: "0 auto", padding: "3rem 2rem", display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid var(--border)" }}>
-        <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 17, color: "var(--text-primary)" }}>Meet<span style={{ color: "var(--accent)" }}>Log</span></div>
+        <div style={{ fontFamily: "'Pretendard Variable', Pretendard, sans-serif", fontSize: 17, color: "var(--text-primary)" }}>Meet<span style={{ color: "var(--accent)" }}>Log</span></div>
         <div style={{ display: "flex", gap: "1.5rem" }}>
           {[
             { label: "GitHub", href: "https://github.com/kimdongwoo0930" },
@@ -273,9 +268,6 @@ export default function LandingPage() {
         </div>
         <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>© 2025 김동우. All rights reserved.</div>
       </footer>
-
-      {/* AUTH MODAL */}
-      {modalTab && <AuthModal onClose={closeModal} initialTab={modalTab} />}
     </div>
   );
 }

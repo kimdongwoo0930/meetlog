@@ -83,7 +83,7 @@ export default function AuthModal({ onClose, initialTab = 'login' }: AuthModalPr
 
         {/* Logo */}
         <div style={{
-          fontFamily: "var(--font-instrument-serif), serif",
+          fontFamily: "'Pretendard Variable', Pretendard, sans-serif",
           fontSize: 20, color: "var(--text-primary)", marginBottom: "1.5rem",
         }}>
           Meet<span style={{ color: "var(--accent)" }}>Log</span>

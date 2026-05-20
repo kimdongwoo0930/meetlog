@@ -330,14 +330,7 @@ export default function MeetingRoomPage() {
     const endTime = startTime + 5;
     segmentTimeRef.current = endTime;
 
-    await fetch(`${API_URL}/api/meetings/${id}/segments`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('access_token') ?? ''}`,
-      },
-      body: JSON.stringify({ speaker: myId, content: text.trim(), startTime, endTime }),
-    }).catch(() => {});
+    await meetingsApi.saveSegment(id, { speaker: myId, content: text.trim(), startTime, endTime }).catch(() => {});
   }, [id, myId]);
 
   // VAD 기반 녹음: 말하면 시작, 침묵 1초면 전송
@@ -475,7 +468,7 @@ export default function MeetingRoomPage() {
         flexShrink: 0, zIndex: 10,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{ fontFamily: "var(--font-instrument-serif), serif", fontSize: 17, color: DARK.textPrimary }}>
+          <div style={{ fontFamily: "'Pretendard Variable', Pretendard, sans-serif", fontSize: 17, color: DARK.textPrimary }}>
             Meet<span style={{ color: "#6b8cff" }}>Log</span>
           </div>
           <div style={{ width: 1, height: 18, background: DARK.border }} />

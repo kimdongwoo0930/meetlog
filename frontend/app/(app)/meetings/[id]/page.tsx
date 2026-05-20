@@ -83,7 +83,7 @@ export default function MeetingDetailPage({ params: _params }: { params: Promise
         {/* MINUTES MAIN */}
         <div style={{ flex: 1, padding: "36px 40px", maxWidth: 760, borderRight: "1px solid var(--border)" }}>
           <h1 style={{
-            fontFamily: "var(--font-instrument-serif), serif",
+            fontFamily: "'Pretendard Variable', Pretendard, sans-serif",
             fontSize: 28, lineHeight: 1.2, letterSpacing: "-0.02em",
             color: "var(--text-primary)", marginBottom: 6,
           }}>{meeting.title}</h1>

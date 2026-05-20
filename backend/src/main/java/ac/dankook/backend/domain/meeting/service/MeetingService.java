@@ -12,6 +12,7 @@ import ac.dankook.backend.domain.meeting.repository.MeetingRepository;
 import ac.dankook.backend.domain.todo.dto.TodoResponse;
 import ac.dankook.backend.domain.todo.entity.Todo;
 import ac.dankook.backend.domain.todo.repository.TodoRepository;
+import ac.dankook.backend.domain.transcript.service.TranscriptService;
 import ac.dankook.backend.domain.user.dto.UserResponse;
 import ac.dankook.backend.domain.user.entity.User;
 import ac.dankook.backend.domain.user.repository.UserRepository;
@@ -35,6 +36,7 @@ public class MeetingService {
     private final MeetingRepository meetingRepository;
     private final TodoRepository todoRepository;
     private final UserRepository userRepository;
+    private final TranscriptService transcriptService;
 
     @Transactional(readOnly = true)
     public List<MeetingSummaryResponse> getMyMeetings() {
@@ -79,6 +81,7 @@ public class MeetingService {
         if (request.status() == MeetingStatus.IN_PROGRESS) {
             meeting.start(LocalDateTime.now());
         } else if (request.status() == MeetingStatus.COMPLETED) {
+            transcriptService.flushToDatabase(meeting);
             meeting.complete(LocalDateTime.now());
         }
 
