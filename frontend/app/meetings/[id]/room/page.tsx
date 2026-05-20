@@ -187,7 +187,7 @@ export default function MeetingRoomPage() {
   const [isListening, setIsListening] = useState(false);
 
   // 자막 편집 상태
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
 
   const canEditItem = (item: TranscriptItem) => isHost || item.speaker === myEmail;

@@ -157,9 +157,9 @@ export function useWebRTC(meetingId: string, myId: string) {
 
     } else if (type === 'ice-candidate' && message.to === myId) {
       const pc = peerConnections.current.get(from);
-      if (!pc) return;
+      if (!pc || pc.signalingState === 'closed') return;
       if (pc.remoteDescription !== null) {
-        await pc.addIceCandidate(new RTCIceCandidate(payload as RTCIceCandidateInit));
+        await pc.addIceCandidate(new RTCIceCandidate(payload as RTCIceCandidateInit)).catch(() => {});
       } else {
         // remoteDescription 설정 전에 도착한 candidate는 버퍼에 보관
         const buf = iceCandidateBuffer.current.get(from) ?? [];
