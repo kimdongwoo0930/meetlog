@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="280" height="60" viewBox="0 0 280 60">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@700&amp;display=swap');
+      .logo-text { font-family: 'Inter', sans-serif; }
+    </style>
+    <clipPath id="iconClip">
+      <rect x="0" y="0" width="54" height="54" rx="13"/>
+    </clipPath>
+  </defs>
+
+  <!-- 아이콘 배경 -->
+  <rect x="0" y="3" width="54" height="54" rx="13" fill="#2563EB"/>
+
+  <!-- 음파 바 5개 -->
+  <rect x="8"  y="25" width="5" height="10" rx="2.5" fill="white" opacity="0.45"/>
+  <rect x="16" y="19" width="5" height="22" rx="2.5" fill="white" opacity="0.70"/>
+  <rect x="24" y="13" width="5" height="34" rx="2.5" fill="white"/>
+  <rect x="32" y="19" width="5" height="22" rx="2.5" fill="white" opacity="0.70"/>
+  <rect x="40" y="25" width="5" height="10" rx="2.5" fill="white" opacity="0.45"/>
+
+  <!-- 체크 뱃지 (우측 하단) -->
+  <circle cx="47" cy="49" r="10" fill="#111110"/>
+  <polyline points="42,49 45,52 52,45" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Meet -->
+  <text x="68" y="27" class="logo-text" font-size="26" font-weight="700" fill="#1A1916" letter-spacing="-0.5">Meet</text>
+  <!-- Log -->
+  <text x="151" y="27" class="logo-text" font-size="26" font-weight="700" fill="#2563EB" letter-spacing="-0.5">Log</text>
+
+  <!-- 태그라인 -->
+  <text x="68" y="46" class="logo-text" font-size="11" font-weight="400" fill="#6B6760" letter-spacing="0.2">AI 회의록 자동화 플랫폼</text>
+</svg>

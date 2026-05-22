@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/src/lib/api";
@@ -35,13 +36,9 @@ export default function LandingPage() {
         borderBottom: "1px solid var(--border)", padding: "0 2rem",
         height: 56, display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
-        <div style={{
-          display: "flex", alignItems: "center", gap: 8,
-          fontFamily: "'Pretendard Variable', Pretendard, sans-serif",
-          fontSize: 20, color: "var(--text-primary)",
-        }}>
-          Meet<span style={{ color: "var(--accent)" }}>Log</span>
-        </div>
+        <Link href="/" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
+          <Image src="/assets/logo.svg" alt="MeetLog" width={120} height={36} priority />
+        </Link>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {isLoggedIn ? (
             <button
@@ -204,7 +201,7 @@ export default function LandingPage() {
       <section id="features" style={{ maxWidth: 1100, margin: "0 auto", padding: "6rem 2rem" }}>
         <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--accent)", marginBottom: "1rem" }}>주요 기능</div>
         <h2 style={{ fontFamily: "'Pretendard Variable', Pretendard, sans-serif", fontSize: "clamp(30px, 4vw, 44px)", lineHeight: 1.15, letterSpacing: "-0.02em", color: "var(--text-primary)", maxWidth: 520, marginBottom: "1rem" }}>회의의 모든 순간을<br />놓치지 않습니다</h2>
-        <p style={{ fontSize: 15.5, color: "var(--text-secondary)", maxWidth: 460, lineHeight: 1.7, marginBottom: "3rem" }}>실시간 음성 통신부터 AI 분석까지, 회의의 전 과정을 MeetLog가 처리합니다.</p>
+        <p style={{ fontSize: 15.5, color: "var(--text-secondary)", maxWidth: 500, lineHeight: 1.7, marginBottom: "3rem" }}>실시간 음성 통신부터 AI 분석까지, 회의의 전 과정을 MeetLog가 처리합니다.</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1px", background: "var(--border)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
           {[
             { icon: "🎙", title: "실시간 음성 회의", desc: "WebRTC 기반의 고품질 실시간 음성 통신. 회의방 생성, 참여, 화면 공유까지 지원합니다." },
@@ -256,16 +253,7 @@ export default function LandingPage() {
       </section>
       {/* FOOTER */}
       <footer style={{ maxWidth: 1100, margin: "0 auto", padding: "3rem 2rem", display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid var(--border)" }}>
-        <div style={{ fontFamily: "'Pretendard Variable', Pretendard, sans-serif", fontSize: 17, color: "var(--text-primary)" }}>Meet<span style={{ color: "var(--accent)" }}>Log</span></div>
-        <div style={{ display: "flex", gap: "1.5rem" }}>
-          {[
-            { label: "GitHub", href: "https://github.com/kimdongwoo0930" },
-            { label: "Velog", href: "https://velog.io/@kimdongwoo0930" },
-            { label: "개인정보처리방침", href: "#" },
-          ].map(link => (
-            <a key={link.label} href={link.href} target={link.href.startsWith("http") ? "_blank" : undefined} rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--text-tertiary)", textDecoration: "none" }}>{link.label}</a>
-          ))}
-        </div>
+        <Image src="/assets/logo.svg" alt="MeetLog" width={100} height={30} />
         <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>© 2025 김동우. All rights reserved.</div>
       </footer>
     </div>
