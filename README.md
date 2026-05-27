@@ -1,5 +1,9 @@
 <div align="center">
 
+<img src="frontend/public/assets/logo.svg" width="200" alt="MeetLog Logo" />
+
+<br /><br />
+
 <img src="https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" />
 <img src="https://img.shields.io/badge/Spring_Boot-6DB33F?style=for-the-badge&logo=springboot&logoColor=white" />
 <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" />
@@ -18,8 +22,8 @@
 ```
 meetlog/
 ├── frontend/       # Next.js 14 앱 (포트 3000)
-├── backend/        # Spring Boot 3 앱 (포트 8080)
-└── ai-server/      # FastAPI + faster-whisper (포트 8000)
+├── backend/        # Spring Boot 3 앱 (포트 8100)
+└── ai-server/      # FastAPI + faster-whisper (포트 8101)
 ```
 
 
@@ -71,3 +75,7 @@ POST /api/meetings/{id}/segments  →  Spring Boot
     ▼
 Qwen2.5-14B 로 회의록 정리
 ```
+
+## 주의
+
+도커로 FastAPI를 실행시 device를 Auto로 해도 CPU만 사용한다. (Metal 사용 불가)

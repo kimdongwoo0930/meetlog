@@ -1,0 +1,27 @@
+{
+  "summary": "JWT 인증 플로우와 권한 관리를 위한 접근 및 리프레시 토큰 전략을 논의하였으며, Refresh Token 회전과 Redis 블랙리스트를 도입하기로 결정했습니다. 또한 ROLE_OWNER와 ROLE_MEMBER 두 가지 권한 롤을 우선적으로 적용하고 소셜 로그인은 Google OAuth2만 지원하는 것으로 확정하였습니다.",
+  "decisions": [
+    "Access Token 15분, Refresh Token 7일 유효 기간 설정",
+    "Refresh Token 회전 방식 도입",
+    "Redis 블랙리스트 사용",
+    "ROLE_OWNER와 ROLE_MEMBER 두 가지 권한 롤 적용",
+    "Google OAuth2를 통한 소셜 로그인 지원"
+  ],
+  "todos": [
+    {
+      "text": "Docker Compose에 Redis 컨테이너 추가",
+      "member": "한지수"
+    },
+    {
+      "text": "httpOnly Cookie + 메모리 저장 방식 구현",
+      "member": "최재원"
+    }
+  ],
+  "questions": [
+    "Redis 블랙리스트 관리를 위한 인프라 준비 필요성"
+  ],
+  "next_agenda": [
+    "권한 관리 세부 사항 논의",
+    "소셜 로그인 구현"
+  ]
+}

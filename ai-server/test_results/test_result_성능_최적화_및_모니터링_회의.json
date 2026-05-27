@@ -1,0 +1,38 @@
+{
+  "summary": "회의에서는 STT 처리 속도 개선을 위한 Whisper 모델의 small 버전 사용, 비동기 큐 방식으로 전환 및 FastAPI BackgroundTasks 활용, GPU 없이 CPU에서 동작하는 경우 compute_type int8 설정 변경 등을 논의하였습니다. 또한 서버 모니터링 체계로 Prometheus와 Grafana 조합을 고려하였으나, 초기 구현 단계에서는 structlog를 사용하여 로깅을 구조화하고 Sentry를 에러 추적용으로 도입하기로 결정했습니다.",
+  "decisions": [
+    "Whisper 모델 small 버전 사용",
+    "비동기 큐 방식 전환 및 FastAPI BackgroundTasks 활용",
+    "compute_type int8 설정 변경",
+    "structlog 로깅 도입",
+    "Sentry 에러 추적 도입"
+  ],
+  "todos": [
+    {
+      "text": "Whisper 모델 small 버전으로 변경 후 성능 테스트",
+      "member": "이준혁"
+    },
+    {
+      "text": "FastAPI BackgroundTasks로 전환 구현",
+      "member": "이준혁"
+    },
+    {
+      "text": "compute_type int8 설정 변경 및 벤치마크 수행",
+      "member": "이준혁"
+    },
+    {
+      "text": "structlog 로깅 도입",
+      "member": "한지수"
+    },
+    {
+      "text": "Sentry 에러 추적 도입",
+      "member": "최재원"
+    }
+  ],
+  "questions": [
+    "Whisper 모델 small 버전으로 변경 시 정확도 감소 여부 확인"
+  ],
+  "next_agenda": [
+    "STT 처리 속도 개선 결과 검토 및 추가 개선 방안 논의"
+  ]
+}
