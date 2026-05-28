@@ -8,6 +8,8 @@ function StatusBadge({ status }: { status: string }) {
   const configs: Record<string, { label: string; bg: string; color: string; border: string }> = {
     SCHEDULED:   { label: "예정",    bg: "var(--accent-light)",  color: "var(--accent)",  border: "var(--accent-border)" },
     IN_PROGRESS: { label: "진행 중", bg: "var(--red-light)",     color: "var(--red)",     border: "#fecaca" },
+    REVIEWING:   { label: "검토 중", bg: "#fff7ed",              color: "#ea580c",        border: "#fed7aa" },
+    GENERATING:  { label: "생성 중", bg: "#faf5ff",              color: "#9333ea",        border: "#e9d5ff" },
     COMPLETED:   { label: "완료",    bg: "var(--green-light)",   color: "var(--green)",   border: "var(--green-border)" },
   };
   const c = configs[status] ?? configs["COMPLETED"];
@@ -25,7 +27,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function formatDate(dateStr?: string) {
   if (!dateStr) return "-";
-  const d = new Date(dateStr);
+  const d = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
   const now = new Date();
   const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
   if (diffDays === 0) return `오늘 ${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`;
@@ -108,12 +110,23 @@ export default function MeetingsPage() {
                 </div>
                 <div><StatusBadge status={m.status} /></div>
                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <Link href={m.status === "IN_PROGRESS" ? `/meetings/${m.id}/room` : `/meetings/${m.id}`} style={{
-                    fontSize: 12, color: "var(--text-tertiary)",
-                    padding: "4px 10px", borderRadius: 6,
-                    border: "1px solid var(--border)", textDecoration: "none",
-                  }}>
-                    {m.status === "IN_PROGRESS" ? "참여 →" : m.status === "SCHEDULED" ? "입장 →" : "회의록 →"}
+                  <Link
+                    href={
+                      m.status === "IN_PROGRESS" ? `/meetings/${m.id}/room`
+                      : m.status === "REVIEWING" ? `/meetings/${m.id}/review`
+                      : `/meetings/${m.id}`
+                    }
+                    style={{
+                      fontSize: 12, color: "var(--text-tertiary)",
+                      padding: "4px 10px", borderRadius: 6,
+                      border: "1px solid var(--border)", textDecoration: "none",
+                    }}
+                  >
+                    {m.status === "IN_PROGRESS" ? "참여 →"
+                      : m.status === "SCHEDULED" ? "입장 →"
+                      : m.status === "REVIEWING" ? "검토하기 →"
+                      : m.status === "GENERATING" ? "생성 중..."
+                      : "회의록 →"}
                   </Link>
                 </div>
               </div>

@@ -53,12 +53,16 @@ public class MeetingService {
         participants.add(currentUser);
         participants.addAll(resolveParticipants(request.participantIds()));
 
+        String pwd = (request.password() != null && !request.password().isBlank()) ? request.password() : null;
         Meeting meeting = Meeting.builder()
                 .title(request.title())
                 .status(MeetingStatus.IN_PROGRESS)
                 .hostUser(currentUser)
                 .participants(participants)
                 .startedAt(LocalDateTime.now())
+                .password(pwd)
+                .maxParticipants(request.maxParticipants())
+                .recordingEnabled(request.recordingEnabled())
                 .build();
 
         Meeting saved = meetingRepository.save(meeting);
@@ -202,6 +206,14 @@ public class MeetingService {
         }
     }
 
+    @Transactional
+    public void verifyPassword(Long meetingId, String password) {
+        Meeting meeting = findMeeting(meetingId);
+        if (meeting.getPassword() == null || !meeting.getPassword().equals(password)) {
+            throw new CustomException(ErrorCode.MEETING_FORBIDDEN);
+        }
+    }
+
     private MeetingSummaryResponse toSummaryResponse(Meeting meeting) {
         return new MeetingSummaryResponse(
                 meeting.getId(),
@@ -211,7 +223,10 @@ public class MeetingService {
                 meeting.getParticipants().size(),
                 meeting.getStartedAt(),
                 meeting.getEndedAt(),
-                meeting.getCreatedAt()
+                meeting.getCreatedAt(),
+                meeting.getPassword() != null && !meeting.getPassword().isBlank(),
+                meeting.getMaxParticipants(),
+                meeting.isRecordingEnabled()
         );
     }
 
@@ -247,7 +262,10 @@ public class MeetingService {
                                 segment.getEndTime(),
                                 segment.getCreatedAt()
                         ))
-                        .toList()
+                        .toList(),
+                meeting.getPassword() != null && !meeting.getPassword().isBlank(),
+                meeting.getMaxParticipants(),
+                meeting.isRecordingEnabled()
         );
     }
 

@@ -61,6 +61,9 @@ public class Meeting extends BaseCreatedAtEntity {
     @Column
     private Long maxParticipants;
 
+    @Column(nullable = false)
+    private boolean recordingEnabled = true;
+
     
 
     @Enumerated(EnumType.STRING)
@@ -115,7 +118,8 @@ public class Meeting extends BaseCreatedAtEntity {
     
     @Builder
     public Meeting(String title, MeetingStatus status, User hostUser, Set<User> participants,
-                   LocalDateTime startedAt, LocalDateTime endedAt, MeetingMinutes meetingMinutes) {
+                   LocalDateTime startedAt, LocalDateTime endedAt, MeetingMinutes meetingMinutes,
+                   String password, Long maxParticipants, boolean recordingEnabled) {
         this.title = title;
         this.status = status == null ? MeetingStatus.SCHEDULED : status;
         this.hostUser = hostUser;
@@ -123,6 +127,9 @@ public class Meeting extends BaseCreatedAtEntity {
         this.startedAt = startedAt;
         this.endedAt = endedAt;
         this.meetingMinutes = meetingMinutes;
+        this.password = password;
+        this.maxParticipants = maxParticipants;
+        this.recordingEnabled = recordingEnabled;
     }
 
     public void addParticipant(User user) {

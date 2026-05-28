@@ -6,6 +6,9 @@ import java.util.List;
 
 public record CreateMeetingRequest(
         @NotBlank String title,
-        List<Long> participantIds
+        List<Long> participantIds,
+        String password,
+        Long maxParticipants,
+        boolean recordingEnabled
 ) {
 }

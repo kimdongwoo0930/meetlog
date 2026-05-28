@@ -4,6 +4,7 @@ import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { meetingsApi, participantApi, type Meeting, type MeetingMinutes, type UserSummary } from "@/src/lib/api";
+import MeetingPasswordModal, { isPasswordAuthed } from "@/src/components/MeetingPasswordModal";
 
 function formatDate(iso: string) {
   const d = new Date(iso.endsWith('Z') ? iso : iso + 'Z');
@@ -26,9 +27,17 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
   const [participants, setParticipants] = useState<UserSummary[]>([]);
   const [generating, setGenerating] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [needPassword, setNeedPassword] = useState(false);
 
   useEffect(() => {
-    meetingsApi.get(id).then(setMeeting).catch(() => setLoadError("회의 정보를 불러올 수 없습니다."));
+    meetingsApi.get(id).then(m => {
+      const myEmail = localStorage.getItem('userEmail');
+      const isHost = myEmail && m.hostUserEmail === myEmail;
+      if (m.hasPassword && !isHost && !isPasswordAuthed(id)) {
+        setNeedPassword(true);
+      }
+      setMeeting(m);
+    }).catch(() => setLoadError("회의 정보를 불러올 수 없습니다."));
     participantApi.list(id).then(setParticipants).catch(() => {});
   }, [id]);
 
@@ -79,6 +88,10 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
     meetingsApi.getMinutes(id).then(setMinutes).catch(() => {});
   }, [id, meeting]);
 
+  if (needPassword) {
+    return <MeetingPasswordModal meetingId={id} onSuccess={() => setNeedPassword(false)} />;
+  }
+
   if (loadError) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", color: "#6b6760", fontSize: 14 }}>
@@ -95,8 +108,9 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
     );
   }
 
-  // 회의록 생성 중 화면
-  if (generating || !minutes) {
+  // 검토 중 / 생성 중 대기 화면 (COMPLETED면 minutes 없어도 통과)
+  if (meeting.status === 'REVIEWING' || generating || (meeting.status !== 'COMPLETED' && !minutes)) {
+    const isReviewing = meeting.status === 'REVIEWING';
     return (
       <>
         <div style={{
@@ -118,15 +132,15 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
           <div style={{
             width: 56, height: 56, borderRadius: "50%",
             border: "3px solid var(--border)",
-            borderTopColor: "#2563eb",
+            borderTopColor: isReviewing ? "#ea580c" : "#2563eb",
             animation: "spin 1s linear infinite",
           }} />
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)", marginBottom: 6 }}>
-              AI가 회의록을 생성하고 있습니다
+              {isReviewing ? "STT 검토 중입니다" : "회의록을 생성하고 있습니다"}
             </div>
             <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
-              STT 내용을 분석 중입니다. 잠시 기다려주세요.
+              잠시만 기다려주세요.
             </div>
           </div>
         </div>
@@ -217,7 +231,7 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
           )}
 
           {/* SUMMARY */}
-          {minutes.summary && (
+          {minutes?.summary && (
             <MinutesSection icon="📋" iconBg="var(--accent-light)" title="회의 요약">
               <div style={{
                 fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.75,
@@ -228,7 +242,7 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
           )}
 
           {/* DECISIONS */}
-          {minutes.decisions?.length > 0 && (
+          {minutes?.decisions?.length > 0 && (
             <MinutesSection icon="✅" iconBg="var(--green-light)" title="결정사항" count={minutes.decisions.length}>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {minutes.decisions.map((d, i) => (
@@ -252,7 +266,7 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
           )}
 
           {/* TODOS */}
-          {minutes.todos?.length > 0 && (
+          {minutes?.todos?.length > 0 && (
             <MinutesSection icon="🔨" iconBg="#fffbeb" title="할 일 (Action Items)" count={minutes.todos.length}>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {minutes.todos.map((todo, i) => (
@@ -280,7 +294,7 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
           )}
 
           {/* QUESTIONS */}
-          {minutes.questions?.length > 0 && (
+          {minutes?.questions?.length > 0 && (
             <MinutesSection icon="❓" iconBg="#fdf4ff" title="미결 질문" count={minutes.questions.length}>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {minutes.questions.map((q, i) => (
@@ -302,7 +316,7 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
           )}
 
           {/* NEXT AGENDA */}
-          {minutes.nextAgenda?.length > 0 && (
+          {minutes?.nextAgenda?.length > 0 && (
             <MinutesSection icon="📅" iconBg="#f0f9ff" title="다음 회의 안건" count={minutes.nextAgenda.length}>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {minutes.nextAgenda.map((item, i) => (
@@ -331,9 +345,9 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
             <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: 12 }}>회의 정보</div>
             {[
               { label: "참여자", value: `${participants.length}명` },
-              { label: "결정사항", value: `${minutes.decisions?.length ?? 0}개` },
-              { label: "할 일", value: `${minutes.todos?.length ?? 0}개` },
-              { label: "미결 질문", value: `${minutes.questions?.length ?? 0}개` },
+              { label: "결정사항", value: `${minutes?.decisions?.length ?? 0}개` },
+              { label: "할 일", value: `${minutes?.todos?.length ?? 0}개` },
+              { label: "미결 질문", value: `${minutes?.questions?.length ?? 0}개` },
             ].map(row => (
               <div key={row.label} style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",

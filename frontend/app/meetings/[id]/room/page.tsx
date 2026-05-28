@@ -6,6 +6,7 @@ import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { useWebRTC } from '@/src/hooks/useWebRTC';
 import { participantApi, meetingsApi, type UserSummary } from '@/src/lib/api';
+import MeetingPasswordModal, { isPasswordAuthed, setPasswordAuthed } from '@/src/components/MeetingPasswordModal';
 import { useRouter, useParams } from 'next/navigation';
 
 type TranscriptItem = {
@@ -157,6 +158,9 @@ export default function MeetingRoomPage() {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [hostEmail, setHostEmail] = useState<string | null>(null);
+  const [needPassword, setNeedPassword] = useState(false);
+  const [capacityError, setCapacityError] = useState(false);
+  const [recordingEnabled, setRecordingEnabled] = useState(true);
   const [meetingTitle, setMeetingTitle] = useState("");
   const [ending, setEnding] = useState(false);
   const [showPanel, setShowPanel] = useState(true);
@@ -385,7 +389,20 @@ export default function MeetingRoomPage() {
         setSeconds(Math.max(0, elapsed));
       }
       const myEmail = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
-      if (myEmail && meeting.hostUserEmail === myEmail) setIsHost(true);
+      const host = myEmail && meeting.hostUserEmail === myEmail;
+      if (host) setIsHost(true);
+      if (meeting.hasPassword && !host && !isPasswordAuthed(id)) {
+        setNeedPassword(true);
+      }
+      setRecordingEnabled(meeting.recordingEnabled);
+      // 최대 인원 초과 체크 (호스트 제외)
+      if (!host && meeting.maxParticipants) {
+        participantApi.list(id).then(parts => {
+          if (parts.length >= meeting.maxParticipants!) {
+            setCapacityError(true);
+          }
+        }).catch(() => {});
+      }
     }).catch(() => {});
 
     const client = new Client({
@@ -410,7 +427,7 @@ export default function MeetingRoomPage() {
             const myEmail = localStorage.getItem('userEmail');
             // 호스트는 handleEndMeeting에서 직접 /review로 이동하므로 스킵
             if (signal.from !== myEmail) {
-              router.push(`/meetings/${id}`);
+              router.push('/meetings');
             }
           } else if (signal.type === 'mute') {
             setRemoteMutes(prev => ({ ...prev, [signal.from]: signal.muted }));
@@ -552,11 +569,11 @@ export default function MeetingRoomPage() {
     audioContextRef.current = null;
   }, []);
 
-  // localStream 준비되면 자동 녹음 시작 (단, 음소거 상태면 트랙만 비활성화)
+  // localStream 준비되면 자동 녹음 시작 (녹음 비활성화 또는 음소거 상태면 트랙만 비활성화)
   useEffect(() => {
     if (!localStream) return;
     const wasMuted = sessionStorage.getItem(MIC_KEY) === 'true';
-    if (wasMuted) {
+    if (wasMuted || !recordingEnabled) {
       localStream.getAudioTracks().forEach(t => { t.enabled = false; });
     } else {
       startRecording(localStream);
@@ -592,6 +609,26 @@ export default function MeetingRoomPage() {
     const sec = s % 60;
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
   };
+
+  if (needPassword) {
+    return <MeetingPasswordModal meetingId={id} onSuccess={() => setNeedPassword(false)} />;
+  }
+
+  if (capacityError) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", background: DARK.bg, gap: 16 }}>
+        <div style={{ fontSize: 36, opacity: 0.5 }}>🚫</div>
+        <div style={{ fontSize: 17, fontWeight: 600, color: DARK.textPrimary }}>입장 불가</div>
+        <div style={{ fontSize: 13, color: DARK.textSecondary }}>최대 참여 인원에 도달하여 입장할 수 없습니다.</div>
+        <button
+          onClick={() => router.push('/meetings')}
+          style={{ marginTop: 8, padding: "8px 20px", borderRadius: 8, border: `1px solid ${DARK.border}`, background: "transparent", color: DARK.textSecondary, fontSize: 13, cursor: "pointer" }}
+        >
+          목록으로 돌아가기
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div style={{

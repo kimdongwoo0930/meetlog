@@ -12,6 +12,9 @@ public record MeetingSummaryResponse(
         int participantCount,
         LocalDateTime startedAt,
         LocalDateTime endedAt,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        boolean hasPassword,
+        Long maxParticipants,
+        boolean recordingEnabled
 ) {
 }

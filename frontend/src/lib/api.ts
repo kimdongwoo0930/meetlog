@@ -62,6 +62,9 @@ async function request<T>(path: string, init?: RequestInit, isRetry = false): Pr
     const body = await res.json().catch(() => ({}));
     throw new Error(body.message ?? `HTTP ${res.status}`);
   }
+  if (res.status === 204 || res.headers.get('content-length') === '0') {
+    return undefined as T;
+  }
   return res.json();
 }
 
@@ -98,6 +101,9 @@ export interface Meeting {
   startedAt: string;
   endedAt?: string;
   participantCount: number;
+  hasPassword: boolean;
+  maxParticipants?: number;
+  recordingEnabled: boolean;
 }
 
 export interface MeetingMinutes {
@@ -111,10 +117,15 @@ export interface MeetingMinutes {
 export const meetingsApi = {
   list: () => request<Meeting[]>("/api/meetings"),
   get: (id: string) => request<Meeting>(`/api/meetings/${id}`),
-  create: (title: string) =>
+  create: (title: string, options?: { password?: string; maxParticipants?: number; recordingEnabled?: boolean }) =>
     request<Meeting>("/api/meetings", {
       method: "POST",
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({
+        title,
+        password: options?.password || null,
+        maxParticipants: options?.maxParticipants ?? null,
+        recordingEnabled: options?.recordingEnabled ?? true,
+      }),
     }),
   updateStatus: (id: string | number, status: "IN_PROGRESS" | "REVIEWING" | "GENERATING" | "COMPLETED") =>
     request<Meeting>(`/api/meetings/${id}/status`, {
@@ -158,6 +169,15 @@ export const participantApi = {
     request<UserSummary>(`/api/meetings/${meetingId}/participants`, {
       method: "POST",
       body: JSON.stringify({ email }),
+    }),
+};
+
+// Meeting password
+export const meetingPasswordApi = {
+  verify: (meetingId: string, password: string) =>
+    request<void>(`/api/meetings/${meetingId}/verify-password`, {
+      method: "POST",
+      body: JSON.stringify({ password }),
     }),
 };
 

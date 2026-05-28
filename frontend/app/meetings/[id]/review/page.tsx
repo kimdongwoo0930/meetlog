@@ -40,6 +40,11 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
       meetingsApi.getSegments(id),
       participantApi.list(id),
     ]).then(([meeting, segs, parts]) => {
+      const myEmail = localStorage.getItem('userEmail');
+      if (meeting.hostUserEmail !== myEmail) {
+        router.replace(`/meetings/${id}`);
+        return;
+      }
       setMeetingTitle(meeting.title);
       setSegments(segs as Segment[]);
       setParticipants(parts);
@@ -57,42 +62,75 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
   const handleEditSave = async (seg: Segment) => {
     const trimmed = editContent.trim();
     if (!trimmed || trimmed === seg.content) { setEditingId(null); return; }
+    // 낙관적 업데이트: 먼저 화면에 반영
+    setSegments(prev => prev.map(s => s.id === seg.id ? { ...s, content: trimmed } : s));
+    setEditingId(null);
     try {
       await meetingsApi.updateSegment(id, seg.id, trimmed);
-      setSegments(prev => prev.map(s => s.id === seg.id ? { ...s, content: trimmed } : s));
-    } catch {}
-    setEditingId(null);
+    } catch {
+      // 실패 시 원복
+      setSegments(prev => prev.map(s => s.id === seg.id ? { ...s, content: seg.content } : s));
+    }
   };
 
   const handleDelete = async (segId: string) => {
+    const backup = segments.find(s => s.id === segId);
+    setSegments(prev => prev.filter(s => s.id !== segId));
     try {
       await meetingsApi.deleteSegment(id, segId);
-      setSegments(prev => prev.filter(s => s.id !== segId));
-    } catch {}
+    } catch {
+      if (backup) setSegments(prev => [...prev, backup].sort((a, b) => a.startTime - b.startTime));
+    }
   };
 
   const handleGenerate = async () => {
     if (generating) return;
     setGenerating(true);
-    setGenerateError("");
     try {
       await meetingsApi.updateStatus(id, "GENERATING");
-      const transcript = segments
-        .map(s => `[${speakerName(s.speaker)}] ${s.content}`)
-        .join('\n');
-      await aiApi.analyze(id, transcript);
       await meetingsApi.updateStatus(id, "COMPLETED");
-      router.push(`/meetings/${id}`);
-    } catch (err) {
-      setGenerateError(err instanceof Error ? err.message : "회의록 생성에 실패했습니다.");
-      setGenerating(false);
-    }
+    } catch {}
+    setTimeout(() => router.push(`/meetings/${id}`), 3000);
   };
 
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#f9f8f6", color: "#6b6760", fontSize: 14 }}>
         불러오는 중...
+      </div>
+    );
+  }
+
+  if (generating) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", background: "#f9f8f6", gap: 28 }}>
+        <div style={{ position: "relative", width: 72, height: 72 }}>
+          <svg viewBox="0 0 72 72" fill="none" width="72" height="72" style={{ animation: "spin 1.2s linear infinite", position: "absolute", inset: 0 }}>
+            <circle cx="36" cy="36" r="30" stroke="#e8e5de" strokeWidth="5"/>
+            <circle cx="36" cy="36" r="30" stroke="#2563eb" strokeWidth="5" strokeDasharray="60 130" strokeLinecap="round"/>
+          </svg>
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg viewBox="0 0 24 24" fill="none" width="28" height="28">
+              <path d="M12 3l1.5 4.5H18l-3.5 2.5 1.5 4.5L12 12l-4 2.5 1.5-4.5L6 7.5h4.5L12 3z" stroke="#2563eb" strokeWidth="1.5" strokeLinejoin="round"/>
+            </svg>
+          </div>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 17, fontWeight: 600, color: "#1a1916", marginBottom: 8 }}>회의록 생성 중입니다</div>
+          <div style={{ fontSize: 13, color: "#a8a49e" }}>잠시만 기다려 주세요</div>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[0, 1, 2].map(i => (
+            <div key={i} style={{
+              width: 7, height: 7, borderRadius: "50%", background: "#2563eb",
+              animation: `dotpulse 1.2s ease ${i * 0.2}s infinite`,
+            }} />
+          ))}
+        </div>
+        <style>{`
+          @keyframes spin { to { transform: rotate(360deg); } }
+          @keyframes dotpulse { 0%,100%{opacity:0.25;transform:scale(0.8)} 50%{opacity:1;transform:scale(1)} }
+        `}</style>
       </div>
     );
   }

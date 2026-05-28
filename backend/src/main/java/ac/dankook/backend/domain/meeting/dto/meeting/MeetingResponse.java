@@ -18,7 +18,10 @@ public record MeetingResponse(
         LocalDateTime createdAt,
         MeetingMinutesResponse minutes,
         List<TodoResponse> todos,
-        List<TranscriptSegmentResponse> segments
+        List<TranscriptSegmentResponse> segments,
+        boolean hasPassword,
+        Long maxParticipants,
+        boolean recordingEnabled
 ) {
     public record MeetingMinutesResponse(
             String summary,

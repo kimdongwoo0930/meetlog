@@ -66,7 +66,11 @@ export default function NewMeetingPage() {
     setLoading(true);
     setError("");
     try {
-      const meeting = await meetingsApi.create(title.trim());
+      const meeting = await meetingsApi.create(title.trim(), {
+        password: usePassword ? password : undefined,
+        maxParticipants,
+        recordingEnabled: recording,
+      });
       for (const p of participants) {
         await participantApi.add(meeting.id, p.email).catch(() => null);
       }

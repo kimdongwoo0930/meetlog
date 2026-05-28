@@ -70,4 +70,13 @@ public class MeetingController {
     ) {
         return ResponseEntity.ok(meetingService.addParticipant(id, request.email()));
     }
+
+    @PostMapping("/{id}/verify-password")
+    public ResponseEntity<Void> verifyPassword(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, String> body
+    ) {
+        meetingService.verifyPassword(id, body.get("password"));
+        return ResponseEntity.ok().build();
+    }
 }
