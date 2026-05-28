@@ -110,6 +110,7 @@ public class TranscriptService {
 
 
 
+    @Transactional
     public void updateSegment(Long meetingId, String segmentId, String newContent) {
         User caller = getCurrentUser();
         Meeting meeting = meetingRepository.findById(meetingId)
@@ -160,6 +161,7 @@ public class TranscriptService {
         segment.updateContent(newContent);
     }
 
+    @Transactional
     public void deleteSegment(Long meetingId, String segmentId) {
         User caller = getCurrentUser();
         Meeting meeting = meetingRepository.findById(meetingId)
