@@ -6,20 +6,7 @@ faster-whisper 기반 실시간 STT 서버. 회의실에서 녹음된 오디오 
 
 - Python 3.11
 - ffmpeg (`brew install ffmpeg`)
-- conda (권장)
 
-## 설치 및 실행
-
-```bash
-# 최초 1회
-conda create -n meetlog python=3.11 -y
-conda activate meetlog
-pip install -r requirements.txt
-
-# 실행
-conda activate meetlog
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
 
 정상 실행 확인: `http://localhost:8000/health`
 
@@ -67,10 +54,6 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 | `medium` | 높음 | 보통 | ~3GB |
 | `large-v3` | 최고 | 느림 | ~6GB |
 
-모델 변경:
-```bash
-WHISPER_MODEL=medium uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
 
 ## 처리 흐름
 
@@ -90,10 +73,7 @@ faster-whisper STT
 텍스트 반환
 ```
 
-## Whisper 모델 사전 다운로드
 
-첫 `/transcribe` 호출 시 자동으로 다운로드되지만, 미리 받아두려면:
+# 실행
 
-```bash
-python3 -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')"
-```
+> uvicorn main:app --host 0.0.0.0 --port 8101 --reload 

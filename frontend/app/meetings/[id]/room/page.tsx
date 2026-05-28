@@ -337,33 +337,40 @@ export default function MeetingRoomPage() {
 
   useEffect(() => { loadParticipants(); }, [loadParticipants]);
 
-  // 입장 시 완료된 회의면 회의록으로 리다이렉트
+  // 입장 시 진행 중이 아닌 회의면 리다이렉트
   useEffect(() => {
     meetingsApi.get(id).then(meeting => {
-      if (meeting.status === 'COMPLETED') {
+      const myEmail = localStorage.getItem('userEmail');
+      const isHost = myEmail && meeting.hostUserEmail === myEmail;
+      const ended = ['REVIEWING', 'GENERATING', 'COMPLETED'].includes(meeting.status);
+      if (!ended) return;
+      if (isHost && meeting.status !== 'COMPLETED') {
+        router.replace(`/meetings/${id}/review`);
+      } else {
         router.replace(`/meetings/${id}`);
       }
     }).catch(() => {});
   }, [id, router]);
 
-  // 회의 종료 (호스트 전용)
+  // 회의 종료 (호스트 전용) — STT 검토 페이지로 이동
   const handleEndMeeting = async () => {
     if (!isHost || ending) return;
     setEnding(true);
     try {
-      await meetingsApi.updateStatus(id, "COMPLETED");
+      await meetingsApi.updateStatus(id, "REVIEWING");
       if (stompRef.current?.connected) {
         stompRef.current.publish({
           destination: `/app/meetings/${id}/signal`,
-          body: JSON.stringify({ type: 'meeting-ended', from: 'host', to: null, payload: null }),
+          body: JSON.stringify({ type: 'meeting-ended', from: myId, to: null, payload: null }),
         });
       }
     } catch {
       setEnding(false);
       return;
     }
+    stopRecording();
     sessionStorage.removeItem(MIC_KEY);
-    router.push(`/meetings/${id}`);
+    router.push(`/meetings/${id}/review`);
   };
 
   // STOMP WebSocket 연결
@@ -400,7 +407,11 @@ export default function MeetingRoomPage() {
         client.subscribe(`/topic/meetings/${id}/signal`, (message) => {
           const signal = JSON.parse(message.body);
           if (signal.type === 'meeting-ended') {
-            router.push(`/meetings/${id}`);
+            const myEmail = localStorage.getItem('userEmail');
+            // 호스트는 handleEndMeeting에서 직접 /review로 이동하므로 스킵
+            if (signal.from !== myEmail) {
+              router.push(`/meetings/${id}`);
+            }
           } else if (signal.type === 'mute') {
             setRemoteMutes(prev => ({ ...prev, [signal.from]: signal.muted }));
           } else if (signal.type === 'chat') {
@@ -836,12 +847,26 @@ export default function MeetingRoomPage() {
                 </div>
 
                 {/* 자막 목록 */}
-                {transcripts.length === 0 ? (
+                {!isHost && (
+                  <div style={{
+                    fontSize: 11.5, color: DARK.textTertiary,
+                    background: DARK.surface2, border: `1px solid ${DARK.border}`,
+                    borderRadius: 7, padding: "7px 10px", marginBottom: 10,
+                    display: "flex", alignItems: "center", gap: 6,
+                  }}>
+                    <svg viewBox="0 0 12 12" fill="none" width="11" height="11" style={{ flexShrink: 0 }}>
+                      <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.2"/>
+                      <path d="M6 5v3M6 4v.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                    </svg>
+                    내 발화만 표시됩니다. 전체 자막은 호스트에게만 공개됩니다.
+                  </div>
+                )}
+                {(isHost ? transcripts : transcripts.filter(t => t.speaker === myEmail)).length === 0 ? (
                   <div style={{ textAlign: "center", color: DARK.textTertiary, fontSize: 13, padding: "32px 0" }}>
                     아직 자막이 없습니다
                   </div>
                 ) : (
-                  transcripts.map((item) => {
+                  (isHost ? transcripts : transcripts.filter(t => t.speaker === myEmail)).map((item) => {
                     const speakerName = participants.find(p => p.email === item.speaker)?.name ?? item.speaker.split('@')[0];
                     const isEditing = editingId === item.id;
                     const canEdit = canEditItem(item);

@@ -75,15 +75,20 @@ public class TranscriptService {
     public List<TranscriptSegmentDto> getActiveTranscripts(Long meetingId) {
         String key = KEY_PREFIX + meetingId;
         List<String> cached = redisTemplate.opsForList().range(key, 0, -1);
-        if (cached == null || cached.isEmpty()) return List.of();
-
-        List<TranscriptSegmentDto> result = new ArrayList<>();
-        long baseId = System.currentTimeMillis();
-        for (int i = 0; i < cached.size(); i++) {
-            TranscriptSegmentDto dto = deserializeToDto(cached.get(i), baseId + i);
-            if (dto != null) result.add(dto);
+        if (cached != null && !cached.isEmpty()) {
+            List<TranscriptSegmentDto> result = new ArrayList<>();
+            long baseId = System.currentTimeMillis();
+            for (int i = 0; i < cached.size(); i++) {
+                TranscriptSegmentDto dto = deserializeToDto(cached.get(i), baseId + i);
+                if (dto != null) result.add(dto);
+            }
+            return result;
         }
-        return result;
+        // Redis가 비었으면 DB 조회 (flushToDatabase 이후 검토 단계)
+        return segmentRepository.findAllByMeetingIdOrderByStartTimeAsc(meetingId)
+                .stream()
+                .map(TranscriptSegmentDto::from)
+                .toList();
     }
 
     /** 회의 종료 시 Redis → DB 일괄 저장. MeetingService에서 호출. */
@@ -94,7 +99,7 @@ public class TranscriptService {
         if (cached == null || cached.isEmpty()) return;
 
         List<TranscriptSegment> segments = cached.stream()
-                .map(json -> deserialize(json, meeting))
+                .map(json -> deserializeToEntity(json, meeting))
                 .filter(Objects::nonNull)
                 .toList();
 
@@ -112,37 +117,47 @@ public class TranscriptService {
 
         String key = KEY_PREFIX + meetingId;
         List<String> list = redisTemplate.opsForList().range(key, 0, -1);
-        if (list == null) throw new CustomException(ErrorCode.SEGMENT_NOT_FOUND);
 
-        for (int i = 0; i < list.size(); i++) {
-            try {
-                JsonNode node = objectMapper.readTree(list.get(i));
-                JsonNode idNode = node.get("id");
-                if (idNode == null || !idNode.asText().equals(segmentId)) continue;
+        // Redis에 데이터가 있으면 Redis에서 수정
+        if (list != null && !list.isEmpty()) {
+            for (int i = 0; i < list.size(); i++) {
+                try {
+                    JsonNode node = objectMapper.readTree(list.get(i));
+                    JsonNode idNode = node.get("id");
+                    if (idNode == null || !idNode.asText().equals(segmentId)) continue;
 
-                String speaker = node.get("speaker").asText();
-                if (!speaker.equals(caller.getEmail()) && !meeting.isHost(caller)) {
-                    throw new CustomException(ErrorCode.MEETING_FORBIDDEN);
+                    String speaker = node.get("speaker").asText();
+                    if (!speaker.equals(caller.getEmail()) && !meeting.isHost(caller)) {
+                        throw new CustomException(ErrorCode.MEETING_FORBIDDEN);
+                    }
+
+                    String updated = objectMapper.writeValueAsString(Map.of(
+                            "id", segmentId,
+                            "speaker", speaker,
+                            "content", newContent,
+                            "startTime", node.get("startTime").asDouble(),
+                            "endTime", node.get("endTime").asDouble(),
+                            "createdAt", node.get("createdAt").asText()
+                    ));
+                    redisTemplate.opsForList().set(key, i, updated);
+                    broadcastService.broadcastUpdate(meetingId, segmentId, newContent);
+                    return;
+                } catch (CustomException e) {
+                    throw e;
+                } catch (Exception e) {
+                    log.error("세그먼트 수정 중 역직렬화 실패: {}", list.get(i), e);
                 }
-
-                String updated = objectMapper.writeValueAsString(Map.of(
-                        "id", segmentId,
-                        "speaker", speaker,
-                        "content", newContent,
-                        "startTime", node.get("startTime").asDouble(),
-                        "endTime", node.get("endTime").asDouble(),
-                        "createdAt", node.get("createdAt").asText()
-                ));
-                redisTemplate.opsForList().set(key, i, updated);
-                broadcastService.broadcastUpdate(meetingId, segmentId, newContent);
-                return;
-            } catch (CustomException e) {
-                throw e;
-            } catch (Exception e) {
-                log.error("세그먼트 수정 중 역직렬화 실패: {}", list.get(i), e);
             }
+            throw new CustomException(ErrorCode.SEGMENT_NOT_FOUND);
         }
-        throw new CustomException(ErrorCode.SEGMENT_NOT_FOUND);
+
+        // Redis가 비었으면 DB에서 수정 (검토 단계)
+        TranscriptSegment segment = segmentRepository.findBySegmentUuid(segmentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.SEGMENT_NOT_FOUND));
+        if (!segment.getSpeaker().equals(caller.getEmail()) && !meeting.isHost(caller)) {
+            throw new CustomException(ErrorCode.MEETING_FORBIDDEN);
+        }
+        segment.updateContent(newContent);
     }
 
     public void deleteSegment(Long meetingId, String segmentId) {
@@ -152,29 +167,39 @@ public class TranscriptService {
 
         String key = KEY_PREFIX + meetingId;
         List<String> list = redisTemplate.opsForList().range(key, 0, -1);
-        if (list == null) throw new CustomException(ErrorCode.SEGMENT_NOT_FOUND);
 
-        for (String json : list) {
-            try {
-                JsonNode node = objectMapper.readTree(json);
-                JsonNode idNode = node.get("id");
-                if (idNode == null || !idNode.asText().equals(segmentId)) continue;
+        // Redis에 데이터가 있으면 Redis에서 삭제
+        if (list != null && !list.isEmpty()) {
+            for (String json : list) {
+                try {
+                    JsonNode node = objectMapper.readTree(json);
+                    JsonNode idNode = node.get("id");
+                    if (idNode == null || !idNode.asText().equals(segmentId)) continue;
 
-                String speaker = node.get("speaker").asText();
-                if (!speaker.equals(caller.getEmail()) && !meeting.isHost(caller)) {
-                    throw new CustomException(ErrorCode.MEETING_FORBIDDEN);
+                    String speaker = node.get("speaker").asText();
+                    if (!speaker.equals(caller.getEmail()) && !meeting.isHost(caller)) {
+                        throw new CustomException(ErrorCode.MEETING_FORBIDDEN);
+                    }
+
+                    redisTemplate.opsForList().remove(key, 1, json);
+                    broadcastService.broadcastDelete(meetingId, segmentId);
+                    return;
+                } catch (CustomException e) {
+                    throw e;
+                } catch (Exception e) {
+                    log.error("세그먼트 삭제 중 역직렬화 실패: {}", json, e);
                 }
-
-                redisTemplate.opsForList().remove(key, 1, json);
-                broadcastService.broadcastDelete(meetingId, segmentId);
-                return;
-            } catch (CustomException e) {
-                throw e;
-            } catch (Exception e) {
-                log.error("세그먼트 삭제 중 역직렬화 실패: {}", json, e);
             }
+            throw new CustomException(ErrorCode.SEGMENT_NOT_FOUND);
         }
-        throw new CustomException(ErrorCode.SEGMENT_NOT_FOUND);
+
+        // Redis가 비었으면 DB에서 삭제 (검토 단계)
+        TranscriptSegment segment = segmentRepository.findBySegmentUuid(segmentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.SEGMENT_NOT_FOUND));
+        if (!segment.getSpeaker().equals(caller.getEmail()) && !meeting.isHost(caller)) {
+            throw new CustomException(ErrorCode.MEETING_FORBIDDEN);
+        }
+        segmentRepository.delete(segment);
     }
 
 
@@ -234,10 +259,11 @@ public class TranscriptService {
         }
     }
 
-    private TranscriptSegment deserialize(String json, Meeting meeting) {
+    private TranscriptSegment deserializeToEntity(String json, Meeting meeting) {
         try {
             JsonNode node = objectMapper.readTree(json);
             return TranscriptSegment.builder()
+                    .segmentUuid(node.has("id") ? node.get("id").asText() : UUID.randomUUID().toString())
                     .meeting(meeting)
                     .speaker(node.get("speaker").asText())
                     .content(node.get("content").asText())

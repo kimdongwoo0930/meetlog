@@ -92,7 +92,7 @@ export const authApi = {
 export interface Meeting {
   id: string;
   title: string;
-  status: "SCHEDULED" | "IN_PROGRESS" | "COMPLETED";
+  status: "SCHEDULED" | "IN_PROGRESS" | "REVIEWING" | "GENERATING" | "COMPLETED";
   hostUserId: number;
   hostUserEmail: string;
   startedAt: string;
@@ -116,7 +116,7 @@ export const meetingsApi = {
       method: "POST",
       body: JSON.stringify({ title }),
     }),
-  updateStatus: (id: string | number, status: "IN_PROGRESS" | "COMPLETED") =>
+  updateStatus: (id: string | number, status: "IN_PROGRESS" | "REVIEWING" | "GENERATING" | "COMPLETED") =>
     request<Meeting>(`/api/meetings/${id}/status`, {
       method: "PATCH",
       body: JSON.stringify({ status }),

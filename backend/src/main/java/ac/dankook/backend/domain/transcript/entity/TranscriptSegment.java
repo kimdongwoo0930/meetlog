@@ -26,6 +26,9 @@ public class TranscriptSegment extends BaseCreatedAtEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(length = 36, unique = true)
+    private String segmentUuid;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "meeting_id", nullable = false)
     private Meeting meeting;
@@ -42,8 +45,13 @@ public class TranscriptSegment extends BaseCreatedAtEntity {
     @Column(nullable = false)
     private Double endTime;
 
+    public void updateContent(String content) {
+        this.content = content;
+    }
+
     @Builder
-    public TranscriptSegment(Meeting meeting, String speaker, String content, Double startTime, Double endTime) {
+    public TranscriptSegment(String segmentUuid, Meeting meeting, String speaker, String content, Double startTime, Double endTime) {
+        this.segmentUuid = segmentUuid;
         this.meeting = meeting;
         this.speaker = speaker;
         this.content = content;

@@ -1,18 +1,4 @@
 services:
-  ai-server:
-    build:
-      context: ./ai-server
-    container_name: meetlog-ai
-    expose:
-      - "8101"
-    environment:
-      WHISPER_MODEL: ${WHISPER_MODEL:-medium}
-      PORT: 8101
-    volumes:
-      - whisper-cache:/root/.cache/huggingface
-    networks:
-      - proxy
-    restart: unless-stopped
 
   backend:
     build:

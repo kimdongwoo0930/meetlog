@@ -14,7 +14,7 @@ public record TranscriptSegmentDto(
 ) {
     public static TranscriptSegmentDto from(TranscriptSegment segment) {
         return new TranscriptSegmentDto(
-                segment.getId().toString(),
+                segment.getSegmentUuid() != null ? segment.getSegmentUuid() : segment.getId().toString(),
                 segment.getSpeaker(),
                 segment.getContent(),
                 segment.getStartTime(),

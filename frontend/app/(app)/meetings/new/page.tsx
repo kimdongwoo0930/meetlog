@@ -5,11 +5,6 @@ import { useRouter } from "next/navigation";
 import { meetingsApi, userApi, participantApi, type UserSummary } from "@/src/lib/api";
 
 const MEETING_TYPES = ["스프린트", "기획", "데일리", "회고", "기타"];
-const STT_MODELS = [
-  { value: "medium", label: "faster-whisper medium (권장)" },
-  { value: "small", label: "faster-whisper small (빠름)" },
-  { value: "large-v3", label: "faster-whisper large-v3 (고화질)" },
-];
 
 export default function NewMeetingPage() {
   const router = useRouter();
@@ -31,7 +26,6 @@ export default function NewMeetingPage() {
 
   // 회의 설정
   const [recording, setRecording] = useState(true);
-  const [sttModel, setSttModel] = useState("medium");
   const [usePassword, setUsePassword] = useState(false);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -244,20 +238,7 @@ export default function NewMeetingPage() {
               onChange={setRecording}
             />
 
-            {recording ? (
-              <div style={{ paddingTop: 8, paddingBottom: 12, borderBottom: "0.5px solid var(--border)" }}>
-                <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "0 0 8px" }}>STT 모델</p>
-                <select
-                  value={sttModel}
-                  onChange={e => setSttModel(e.target.value)}
-                  style={{ ...inputStyle }}
-                >
-                  {STT_MODELS.map(m => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
-                  ))}
-                </select>
-              </div>
-            ) : (
+            {!recording && (
               <div style={{
                 display: "flex", alignItems: "flex-start", gap: 8,
                 padding: "10px 12px", borderRadius: 7, marginBottom: 4,
