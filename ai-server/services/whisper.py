@@ -60,6 +60,7 @@ async def transcribe_audio(content: bytes, filename: str) -> str:
                     beam_size=5,
                     vad_filter=True,
                     vad_parameters=dict(min_silence_duration_ms=500),
+                    initial_prompt="한국어 회의 내용입니다.",
                     condition_on_previous_text=False,
                 ),
             )
