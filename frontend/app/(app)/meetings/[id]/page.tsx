@@ -242,10 +242,10 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
           )}
 
           {/* DECISIONS */}
-          {minutes?.decisions?.length > 0 && (
-            <MinutesSection icon="✅" iconBg="var(--green-light)" title="결정사항" count={minutes.decisions.length}>
+          {(minutes?.decisions?.length ?? 0) > 0 && (
+            <MinutesSection icon="✅" iconBg="var(--green-light)" title="결정사항" count={minutes!.decisions.length}>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {minutes.decisions.map((d, i) => (
+                {minutes!.decisions.map((d, i) => (
                   <div key={i} style={{
                     display: "flex", alignItems: "flex-start", gap: 10,
                     padding: "12px 14px", background: "var(--green-light)",
@@ -266,10 +266,10 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
           )}
 
           {/* TODOS */}
-          {minutes?.todos?.length > 0 && (
-            <MinutesSection icon="🔨" iconBg="#fffbeb" title="할 일 (Action Items)" count={minutes.todos.length}>
+          {(minutes?.todos?.length ?? 0) > 0 && (
+            <MinutesSection icon="🔨" iconBg="#fffbeb" title="할 일 (Action Items)" count={minutes!.todos.length}>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {minutes.todos.map((todo, i) => (
+                {minutes!.todos.map((todo, i) => (
                   <div key={i} style={{
                     display: "flex", alignItems: "center", gap: 10,
                     padding: "11px 14px", background: "var(--surface)",
@@ -294,10 +294,10 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
           )}
 
           {/* QUESTIONS */}
-          {minutes?.questions?.length > 0 && (
-            <MinutesSection icon="❓" iconBg="#fdf4ff" title="미결 질문" count={minutes.questions.length}>
+          {(minutes?.questions?.length ?? 0) > 0 && (
+            <MinutesSection icon="❓" iconBg="#fdf4ff" title="미결 질문" count={minutes!.questions.length}>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {minutes.questions.map((q, i) => (
+                {minutes!.questions.map((q, i) => (
                   <div key={i} style={{
                     display: "flex", alignItems: "flex-start", gap: 10,
                     padding: "12px 14px", background: "#fdf4ff",
@@ -316,10 +316,10 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
           )}
 
           {/* NEXT AGENDA */}
-          {minutes?.nextAgenda?.length > 0 && (
-            <MinutesSection icon="📅" iconBg="#f0f9ff" title="다음 회의 안건" count={minutes.nextAgenda.length}>
+          {(minutes?.nextAgenda?.length ?? 0) > 0 && (
+            <MinutesSection icon="📅" iconBg="#f0f9ff" title="다음 회의 안건" count={minutes!.nextAgenda.length}>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {minutes.nextAgenda.map((item, i) => (
+                {minutes!.nextAgenda.map((item, i) => (
                   <div key={i} style={{
                     display: "flex", alignItems: "flex-start", gap: 10,
                     padding: "11px 14px", background: "#f0f9ff",
@@ -345,9 +345,9 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
             <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: 12 }}>회의 정보</div>
             {[
               { label: "참여자", value: `${participants.length}명` },
-              { label: "결정사항", value: `${minutes?.decisions?.length ?? 0}개` },
-              { label: "할 일", value: `${minutes?.todos?.length ?? 0}개` },
-              { label: "미결 질문", value: `${minutes?.questions?.length ?? 0}개` },
+              { label: "결정사항", value: `${minutes?.decisions?.length ?? '-'}개` },
+              { label: "할 일", value: `${minutes?.todos?.length ?? '-'}개` },
+              { label: "미결 질문", value: `${minutes?.questions?.length ?? '-'}개` },
             ].map(row => (
               <div key={row.label} style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",
