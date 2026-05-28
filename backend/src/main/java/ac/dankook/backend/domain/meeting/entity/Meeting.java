@@ -45,6 +45,24 @@ public class Meeting extends BaseCreatedAtEntity {
     @Column(nullable = false, length = 200)
     private String title;
 
+
+    @Column(length = 50)
+    private String meetingType;
+
+    @Column(length = 500)
+    private String meetingGoal;
+
+    @Column(columnDefinition = "TEXT")
+    private String meetingAgenda;
+
+    @Column(length = 100)
+    private String password;
+
+    @Column
+    private Long maxParticipants;
+
+    
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private MeetingStatus status;
@@ -65,15 +83,36 @@ public class Meeting extends BaseCreatedAtEntity {
 
     private LocalDateTime endedAt;
 
+    // 회의록과 일대일 양방향 연관관계 설정
     @OneToOne(mappedBy = "meeting", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private MeetingMinutes meetingMinutes;
 
+
+    // 할 일과 연관된 엔티티 추가
     @OneToMany(mappedBy = "meeting", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Todo> todos = new ArrayList<>();
 
+
+    // 회의록과 연관된 엔티티 추가
     @OneToMany(mappedBy = "meeting", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TranscriptSegment> segments = new ArrayList<>();
 
+
+
+
+    /**
+     * 생성자
+     * @param title
+     * @param status
+     * @param hostUser
+     * @param participants
+     * @param startedAt
+     * @param endedAt
+     * @param meetingMinutes
+     */
+
+
+    
     @Builder
     public Meeting(String title, MeetingStatus status, User hostUser, Set<User> participants,
                    LocalDateTime startedAt, LocalDateTime endedAt, MeetingMinutes meetingMinutes) {
@@ -107,6 +146,20 @@ public class Meeting extends BaseCreatedAtEntity {
         this.startedAt = startedAt;
     }
 
+    public void startReviewing(LocalDateTime endedAt) {
+        this.status = MeetingStatus.REVIEWING;
+        this.endedAt = endedAt;
+    }
+
+    public void startGenerating() {
+        this.status = MeetingStatus.GENERATING;
+    }
+
+    public void complete() {
+        this.status = MeetingStatus.COMPLETED;
+    }
+
+    // 하위 호환용
     public void complete(LocalDateTime endedAt) {
         this.status = MeetingStatus.COMPLETED;
         this.endedAt = endedAt;

@@ -80,9 +80,13 @@ public class MeetingService {
 
         if (request.status() == MeetingStatus.IN_PROGRESS) {
             meeting.start(LocalDateTime.now());
-        } else if (request.status() == MeetingStatus.COMPLETED) {
+        } else if (request.status() == MeetingStatus.REVIEWING) {
             transcriptService.flushToDatabase(meeting);
-            meeting.complete(LocalDateTime.now());
+            meeting.startReviewing(LocalDateTime.now());
+        } else if (request.status() == MeetingStatus.GENERATING) {
+            meeting.startGenerating();
+        } else if (request.status() == MeetingStatus.COMPLETED) {
+            meeting.complete();
         }
 
         return toResponse(meeting);
@@ -187,8 +191,10 @@ public class MeetingService {
 
     private void validateStatusTransition(Meeting meeting, MeetingStatus nextStatus) {
         MeetingStatus currentStatus = meeting.getStatus();
-        boolean valid = (currentStatus == MeetingStatus.SCHEDULED && nextStatus == MeetingStatus.IN_PROGRESS)
-                || (currentStatus == MeetingStatus.IN_PROGRESS && nextStatus == MeetingStatus.COMPLETED)
+        boolean valid = (currentStatus == MeetingStatus.SCHEDULED   && nextStatus == MeetingStatus.IN_PROGRESS)
+                || (currentStatus == MeetingStatus.IN_PROGRESS  && nextStatus == MeetingStatus.REVIEWING)
+                || (currentStatus == MeetingStatus.REVIEWING    && nextStatus == MeetingStatus.GENERATING)
+                || (currentStatus == MeetingStatus.GENERATING   && nextStatus == MeetingStatus.COMPLETED)
                 || currentStatus == nextStatus;
 
         if (!valid) {
