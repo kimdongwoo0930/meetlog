@@ -110,24 +110,26 @@ export default function MeetingsPage() {
                 </div>
                 <div><StatusBadge status={m.status} /></div>
                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <Link
-                    href={
-                      m.status === "IN_PROGRESS" ? `/meetings/${m.id}/room`
-                      : m.status === "REVIEWING" ? `/meetings/${m.id}/review`
-                      : `/meetings/${m.id}`
-                    }
-                    style={{
-                      fontSize: 12, color: "var(--text-tertiary)",
-                      padding: "4px 10px", borderRadius: 6,
-                      border: "1px solid var(--border)", textDecoration: "none",
-                    }}
-                  >
-                    {m.status === "IN_PROGRESS" ? "참여 →"
-                      : m.status === "SCHEDULED" ? "입장 →"
-                      : m.status === "REVIEWING" ? "검토하기 →"
-                      : m.status === "GENERATING" ? "생성 중..."
-                      : "회의록 →"}
-                  </Link>
+                  {!(m.status === "COMPLETED" && !m.hasMinutes) && (
+                    <Link
+                      href={
+                        m.status === "IN_PROGRESS" ? `/meetings/${m.id}/room`
+                        : m.status === "REVIEWING" ? `/meetings/${m.id}/review`
+                        : `/meetings/${m.id}`
+                      }
+                      style={{
+                        fontSize: 12, color: "var(--text-tertiary)",
+                        padding: "4px 10px", borderRadius: 6,
+                        border: "1px solid var(--border)", textDecoration: "none",
+                      }}
+                    >
+                      {m.status === "IN_PROGRESS" ? "참여 →"
+                        : m.status === "SCHEDULED" ? "입장 →"
+                        : m.status === "REVIEWING" ? "검토하기 →"
+                        : m.status === "GENERATING" ? "생성 중..."
+                        : "회의록 →"}
+                    </Link>
+                  )}
                 </div>
               </div>
             ))}

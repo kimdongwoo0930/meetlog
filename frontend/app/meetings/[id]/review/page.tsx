@@ -93,6 +93,13 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
     setTimeout(() => router.push(`/meetings/${id}`), 3000);
   };
 
+  const handleSkip = async () => {
+    try {
+      await meetingsApi.updateStatus(id, "COMPLETED");
+    } catch {}
+    router.push(`/meetings`);
+  };
+
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#f9f8f6", color: "#6b6760", fontSize: 14 }}>
@@ -170,6 +177,18 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
           {generateError && (
             <div style={{ fontSize: 12.5, color: "#ef4444" }}>{generateError}</div>
           )}
+          <button
+            onClick={handleSkip}
+            disabled={generating}
+            style={{
+              padding: "9px 18px", fontSize: 13, borderRadius: 8,
+              border: "1px solid #e8e5de", cursor: generating ? "default" : "pointer",
+              background: "transparent", color: "#6b6760",
+              opacity: generating ? 0.4 : 1,
+            }}
+          >
+            회의록 없이 종료
+          </button>
           <button
             onClick={handleGenerate}
             disabled={generating}

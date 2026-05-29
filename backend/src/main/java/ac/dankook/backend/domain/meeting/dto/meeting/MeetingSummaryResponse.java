@@ -15,6 +15,7 @@ public record MeetingSummaryResponse(
         LocalDateTime createdAt,
         boolean hasPassword,
         Long maxParticipants,
-        boolean recordingEnabled
+        boolean recordingEnabled,
+        boolean hasMinutes
 ) {
 }

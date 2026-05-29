@@ -104,6 +104,7 @@ export interface Meeting {
   hasPassword: boolean;
   maxParticipants?: number;
   recordingEnabled: boolean;
+  hasMinutes: boolean;
 }
 
 export interface MeetingMinutes {

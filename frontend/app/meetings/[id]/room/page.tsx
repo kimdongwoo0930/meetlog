@@ -356,12 +356,16 @@ export default function MeetingRoomPage() {
     }).catch(() => {});
   }, [id, router]);
 
-  // 회의 종료 (호스트 전용) — STT 검토 페이지로 이동
+  // 회의 종료 (호스트 전용)
   const handleEndMeeting = async () => {
     if (!isHost || ending) return;
     setEnding(true);
     try {
-      await meetingsApi.updateStatus(id, "REVIEWING");
+      if (recordingEnabled) {
+        await meetingsApi.updateStatus(id, "REVIEWING");
+      } else {
+        await meetingsApi.updateStatus(id, "COMPLETED");
+      }
       if (stompRef.current?.connected) {
         stompRef.current.publish({
           destination: `/app/meetings/${id}/signal`,
@@ -374,7 +378,11 @@ export default function MeetingRoomPage() {
     }
     stopRecording();
     sessionStorage.removeItem(MIC_KEY);
-    router.push(`/meetings/${id}/review`);
+    if (recordingEnabled) {
+      router.push(`/meetings/${id}/review`);
+    } else {
+      router.push(`/meetings`);
+    }
   };
 
   // STOMP WebSocket 연결

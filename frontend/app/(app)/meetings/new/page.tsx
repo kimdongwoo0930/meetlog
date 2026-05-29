@@ -4,15 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { meetingsApi, userApi, participantApi, type UserSummary } from "@/src/lib/api";
 
-const MEETING_TYPES = ["스프린트", "기획", "데일리", "회고", "기타"];
-
 export default function NewMeetingPage() {
   const router = useRouter();
 
   // 기본 정보
   const [title, setTitle] = useState("");
-  const [meetingType, setMeetingType] = useState("스프린트");
-  const [customType, setCustomType] = useState("");
+  const [meetingType, setMeetingType] = useState("");
 
   // AI 컨텍스트
   const [goal, setGoal] = useState("");
@@ -34,11 +31,6 @@ export default function NewMeetingPage() {
   // 제출
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const selectType = (t: string) => {
-    setMeetingType(t);
-    if (t !== "기타") setCustomType("");
-  };
 
   const handleAddParticipant = async () => {
     const email = emailInput.trim();
@@ -118,34 +110,13 @@ export default function NewMeetingPage() {
             </Field>
 
             <Field label="회의 유형">
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                {MEETING_TYPES.map(t => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => selectType(t)}
-                    style={{
-                      fontSize: 12, padding: "4px 10px", borderRadius: 999, cursor: "pointer",
-                      border: meetingType === t ? "0.5px solid #93C5FD" : "0.5px solid var(--border)",
-                      background: meetingType === t ? "#EFF4FF" : "transparent",
-                      color: meetingType === t ? "#1E40AF" : "var(--text-secondary)",
-                      transition: "all 0.15s",
-                    }}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-              {meetingType === "기타" && (
-                <input
-                  type="text"
-                  value={customType}
-                  onChange={e => setCustomType(e.target.value)}
-                  placeholder="회의 유형을 직접 입력하세요"
-                  style={{ ...inputStyle, marginTop: 8 }}
-                  autoFocus
-                />
-              )}
+              <input
+                type="text"
+                value={meetingType}
+                onChange={e => setMeetingType(e.target.value)}
+                placeholder="예: 스프린트, 기획, 데일리, 회고"
+                style={inputStyle}
+              />
             </Field>
           </Card>
 

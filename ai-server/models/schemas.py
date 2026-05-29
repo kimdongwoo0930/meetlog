@@ -14,9 +14,14 @@ class AnalyzeRequest(BaseModel):
 
 
 
+class TodoItem(BaseModel):
+    text: str                        # 할 일 내용 (동사형)
+    member: str = "미정"             # 담당자, 불명확하면 "미정"
+
+
 class MeetingMinutes(BaseModel):
     summary: str
     decisions: list[str]
-    todos: list[dict]                # [{"text": str, "assignee": str}]
+    todos: list[TodoItem]            # [{"text": str, "member": str}]
     questions: list[str]
     next_agenda: list[str]

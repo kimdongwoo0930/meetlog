@@ -90,7 +90,7 @@ public class MeetingService {
         } else if (request.status() == MeetingStatus.GENERATING) {
             meeting.startGenerating();
         } else if (request.status() == MeetingStatus.COMPLETED) {
-            meeting.complete();
+            meeting.complete(meeting.getEndedAt() != null ? meeting.getEndedAt() : LocalDateTime.now());
         }
 
         return toResponse(meeting);
@@ -197,7 +197,9 @@ public class MeetingService {
         MeetingStatus currentStatus = meeting.getStatus();
         boolean valid = (currentStatus == MeetingStatus.SCHEDULED   && nextStatus == MeetingStatus.IN_PROGRESS)
                 || (currentStatus == MeetingStatus.IN_PROGRESS  && nextStatus == MeetingStatus.REVIEWING)
+                || (currentStatus == MeetingStatus.IN_PROGRESS  && nextStatus == MeetingStatus.COMPLETED)
                 || (currentStatus == MeetingStatus.REVIEWING    && nextStatus == MeetingStatus.GENERATING)
+                || (currentStatus == MeetingStatus.REVIEWING    && nextStatus == MeetingStatus.COMPLETED)
                 || (currentStatus == MeetingStatus.GENERATING   && nextStatus == MeetingStatus.COMPLETED)
                 || currentStatus == nextStatus;
 
@@ -226,7 +228,8 @@ public class MeetingService {
                 meeting.getCreatedAt(),
                 meeting.getPassword() != null && !meeting.getPassword().isBlank(),
                 meeting.getMaxParticipants(),
-                meeting.isRecordingEnabled()
+                meeting.isRecordingEnabled(),
+                meeting.getMeetingMinutes() != null
         );
     }
 

@@ -5,3 +5,7 @@ claude.md
 /dist
 /build
 /.env
+
+# 테스트 파일
+ai-server/test_results
+
