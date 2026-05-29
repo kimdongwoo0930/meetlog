@@ -92,6 +92,29 @@ map 단계에서 누락됐고, **reduce(14B)는 map이 흘린 정보를 복구�
 | 환각 억제 파라미터 | 정확도 | `hallucination_silence_threshold=2.0`, `compression_ratio_threshold=2.4` |
 | 신뢰도 필터 | 정확도 | `avg_logprob`/`no_speech_prob` 기준 오인식 구간 제외 |
 
+### 2-1. 백엔드 전환: faster-whisper → mlx-whisper (속도·품질)
+
+**문제.** faster-whisper의 CTranslate2 백엔드는 **Apple GPU(Metal)를 지원하지 않아** 맥 서버에서
+CPU로만 동작한다. 즉 M2/M3의 GPU가 놀고, 실시간 자막을 보여주기엔 STT가 느리다.
+
+**해결.** STT 백엔드를 설정으로 추상화(`WHISPER_BACKEND`)하고, 맥 서버는 **mlx-whisper(Metal GPU)
++ `large-v3-turbo`** 로 전환. 도커/리눅스 등 비 Apple 환경은 `WHISPER_BACKEND=faster`로 폴백.
+모델도 medium → large-v3-turbo로 올려 한국어 정확도를 높이면서 속도까지 잡았다.
+
+#### 측정 (27.3초 한국어 회의 샘플, **M3 Pro 개발기** — 서버 M2는 절대값 다름, 상대 비교용)
+
+| 구성 | 백엔드 | 모델 | 처리시간 | RTF | 품질 |
+|---|---|---|---|---|---|
+| 기존 | faster-whisper (CPU) | medium | 12.80s | 0.47x | 띄어쓰기 어색, 끝 구간 "하겠습니다" 누락 |
+| **신규** | **mlx-whisper (Metal)** | **large-v3-turbo** | **2.11s** | **0.08x** | 띄어쓰기 정확, 끝까지 전사 |
+
+- **속도 약 6배↑** (RTF 0.47 → 0.08). RTF≪1 이라 실시간 자막에 충분.
+- **품질도 동시 개선**: turbo가 medium보다 한국어 전사가 깔끔하고 누락이 적었다.
+- 한계: 영어 약어(PG/QA)는 음차("피지"/"카")로 적힘 — Whisper 공통 한계, `initial_prompt` 보강으로 완화 가능.
+
+> 핵심: "GPU를 못 쓰는 백엔드(CTranslate2)" 라는 하드웨어 제약을 진단하고, Apple Silicon에
+> 맞는 mlx로 전환해 **속도와 품질을 동시에** 개선. 백엔드는 설정으로 스위칭 가능하게 추상화.
+
 ---
 
 ## 3. 향후 계획 — LoRA 파인튜닝 (distillation)

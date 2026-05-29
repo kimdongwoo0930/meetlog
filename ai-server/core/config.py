@@ -1,6 +1,15 @@
 import os
 
-WHISPER_MODEL = os.getenv("WHISPER_MODEL", "medium")
+# STT 백엔드: "mlx"(Apple Silicon Metal GPU) | "faster"(CTranslate2, CPU on Mac).
+# 맥 서버는 mlx로 GPU를 쓰고, 도커/리눅스 등에서는 WHISPER_BACKEND=faster로 폴백한다.
+WHISPER_BACKEND = os.getenv("WHISPER_BACKEND", "mlx")
+# 모델 기본값은 백엔드에 따라 다르다(이름 규약이 다름). WHISPER_MODEL로 덮어쓸 수 있다.
+_DEFAULT_WHISPER_MODEL = {
+    "mlx": "mlx-community/whisper-large-v3-turbo",
+    "faster": "medium",
+}
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", _DEFAULT_WHISPER_MODEL.get(WHISPER_BACKEND, "medium"))
+
 OLLAMA_MODEL  = os.getenv("OLLAMA_MODEL", "qwen2.5:14b")
 OLLAMA_URL    = os.getenv("OLLAMA_URL", "http://localhost:11434")
 

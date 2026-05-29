@@ -3,17 +3,40 @@ import os
 import re
 import subprocess
 import tempfile
+from types import SimpleNamespace
 
 from fastapi import HTTPException
-from faster_whisper import WhisperModel
 
-from core.config import WHISPER_MODEL, LOGPROB_THRESHOLD, NO_SPEECH_THRESHOLD
+from core.config import (
+    WHISPER_BACKEND,
+    WHISPER_MODEL,
+    LOGPROB_THRESHOLD,
+    NO_SPEECH_THRESHOLD,
+)
 
-# 모델 초기화 (앱 시작 시 1회)
-model = WhisperModel(WHISPER_MODEL, device="auto", compute_type="int8")
-print(f"[ai-server] Whisper model '{WHISPER_MODEL}' loaded")
+# initial_prompt는 지시문이 아니라 "직전 문맥 예시"다. Whisper는 이 스타일을 흉내내므로,
+# 특정 도메인 용어 대신 회의에서 공통으로 쓰는 어휘·말투를 자연스러운 한국어 문장으로 심어
+# 도메인 편향 없이 "회의체 한국어"(존댓말+구어체, 안건/일정/담당자 등)로 받아적게 유도한다.
+_INITIAL_PROMPT = (
+    "네, 그럼 회의를 시작하겠습니다. 오늘 안건과 일정, 담당자를 정리하고 "
+    "지난 회의 내용을 검토하겠습니다. 음, 그러면 하나씩 논의해 보겠습니다."
+)
 
-# WhisperModel은 thread-safe하지 않으므로 한 번에 하나씩 처리
+# ── 백엔드별 모델 초기화 (앱 시작 시 1회) ───────────────────────────
+# mlx: Apple Silicon Metal GPU 사용. faster: CTranslate2(맥에선 CPU).
+_fw_model = None  # faster-whisper WhisperModel 인스턴스
+
+if WHISPER_BACKEND == "mlx":
+    import mlx_whisper  # noqa: F401  (transcribe 시 사용)
+    print(f"[ai-server] STT backend=mlx (Metal GPU), model='{WHISPER_MODEL}'")
+elif WHISPER_BACKEND == "faster":
+    from faster_whisper import WhisperModel
+    _fw_model = WhisperModel(WHISPER_MODEL, device="auto", compute_type="int8")
+    print(f"[ai-server] STT backend=faster-whisper (CPU), model='{WHISPER_MODEL}'")
+else:
+    raise RuntimeError(f"알 수 없는 WHISPER_BACKEND: {WHISPER_BACKEND} (mlx|faster)")
+
+# Whisper 추론은 thread-safe하지 않으므로 한 번에 하나씩 처리
 _transcribe_lock = asyncio.Lock()
 
 # 한국어 Whisper가 무음/노이즈 구간에서 흔히 토해내는 환각 문구.
@@ -36,11 +59,59 @@ def _normalize(s: str) -> str:
     return re.sub(r"[\s.,!?~…]+", "", s).lower()
 
 
+def _transcribe_mlx(wav_path: str):
+    """mlx-whisper로 STT. (segments, language) 반환 — segments는 공통 형태로 정규화."""
+    result = mlx_whisper.transcribe(
+        wav_path,
+        path_or_hf_repo=WHISPER_MODEL,
+        language="ko",
+        initial_prompt=_INITIAL_PROMPT,
+        condition_on_previous_text=False,
+        compression_ratio_threshold=2.4,
+        hallucination_silence_threshold=2.0,
+        verbose=None,
+    )
+    # mlx는 segment를 dict로 반환 → faster-whisper와 같은 속성 접근이 되도록 정규화
+    segments = [
+        SimpleNamespace(
+            start=s.get("start", 0.0),
+            end=s.get("end", 0.0),
+            text=s.get("text", ""),
+            avg_logprob=s.get("avg_logprob", 0.0),
+            no_speech_prob=s.get("no_speech_prob", 0.0),
+        )
+        for s in result.get("segments", [])
+    ]
+    return segments, result.get("language", "ko")
+
+
+def _transcribe_faster(wav_path: str):
+    """faster-whisper로 STT. (segments, language) 반환."""
+    segments, info = _fw_model.transcribe(
+        wav_path,
+        language="ko",
+        beam_size=5,
+        vad_filter=True,
+        vad_parameters=dict(min_silence_duration_ms=500),
+        initial_prompt=_INITIAL_PROMPT,
+        condition_on_previous_text=False,
+        hallucination_silence_threshold=2.0,
+        compression_ratio_threshold=2.4,
+    )
+    return list(segments), info.language
+
+
+def _run_backend(wav_path: str):
+    if WHISPER_BACKEND == "mlx":
+        return _transcribe_mlx(wav_path)
+    return _transcribe_faster(wav_path)
+
+
 async def transcribe_audio(content: bytes, filename: str) -> str:
     """
     오디오 바이트 → STT 텍스트 변환
-    1. ffmpeg으로 WAV 변환 (loudnorm 볼륨 정규화)
-    2. Whisper STT
+    1. ffmpeg으로 WAV 변환 (highpass 노이즈 제거 + loudnorm 볼륨 정규화)
+    2. Whisper STT (백엔드: mlx | faster)
     3. 오인식 구간 필터링
     """
     suffix = os.path.splitext(filename or ".webm")[1] or ".webm"
@@ -70,36 +141,20 @@ async def transcribe_audio(content: bytes, filename: str) -> str:
                 detail=f"ffmpeg 변환 실패: {result.stderr.decode()}"
             )
 
-        # 2. Whisper STT (Lock으로 직렬화)
+        # 2. Whisper STT (Lock으로 직렬화 — 추론은 thread-safe하지 않음)
         async with _transcribe_lock:
             loop = asyncio.get_event_loop()
-            segments, info = await loop.run_in_executor(
-                None,
-                lambda: model.transcribe(
-                    tmp_wav_path,
-                    language="ko",
-                    beam_size=5,
-                    vad_filter=True,
-                    vad_parameters=dict(min_silence_duration_ms=500),
-                    initial_prompt="다음은 한국어 업무 회의 녹취입니다. 존댓말과 구어체가 섞여 있습니다.",
-                    condition_on_previous_text=False,
-                    # 무음 구간에서 환각 문장 생성 억제
-                    hallucination_silence_threshold=2.0,
-                    # 비정상적으로 반복된(압축률 높은) 구간은 재디코딩 유도
-                    compression_ratio_threshold=2.4,
-                ),
+            segments, language = await loop.run_in_executor(
+                None, lambda: _run_backend(tmp_wav_path)
             )
 
-        print(
-            f"[whisper] 언어={info.language}"
-            f"({info.language_probability:.2f})"
-        )
+        print(f"[whisper] backend={WHISPER_BACKEND} 언어={language}")
 
         # 3. 오인식 구간 필터링
-        all_segments = list(segments)
         filtered = []
         prev_norm = None
-        for seg in all_segments:
+        hallucinations = {_normalize(p) for p in _HALLUCINATION_PHRASES}
+        for seg in segments:
             seg_text = seg.text.strip()
             norm = _normalize(seg_text)
 
@@ -109,7 +164,7 @@ async def transcribe_audio(content: bytes, filename: str) -> str:
                 and seg.no_speech_prob < NO_SPEECH_THRESHOLD
             )
             # 알려진 환각 문구 / 직전 구간과 동일한 반복은 제외
-            is_hallucination = norm in {_normalize(p) for p in _HALLUCINATION_PHRASES}
+            is_hallucination = norm in hallucinations
             is_repeat = norm and norm == prev_norm
             passed = confident and not is_hallucination and not is_repeat and bool(norm)
 
