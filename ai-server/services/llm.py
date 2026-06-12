@@ -138,7 +138,7 @@ async def _ollama_chat(
 def _split_into_chunks(text: str, limit: int) -> list[str]:
     """문장 경계를 지켜 text를 limit 글자 이하의 청크들로 나눈다."""
     # 문장 끝(. ? !) 뒤 공백 기준으로 분할 — 문장 중간을 자르지 않는다.
-    sentences = re.split(r"(?<=[.?!])\s+", text)
+    sentences = re.split(r"(?<=[.?!。？！])\s+", text)
     chunks: list[str] = []
     cur = ""
     for s in sentences:
@@ -204,10 +204,14 @@ async def _analyze_mapreduce(text: str, goal: str | None, agenda: str | None) ->
 
     # map: 구간별 핵심 정리 (순차 — Ollama 단일 인스턴스)
     notes = []
+    import time
+
     for i, chunk in enumerate(chunks, 1):
+        start = time.time()
         user = f"(구간 {i}/{len(chunks)})\n\n{chunk}"
         note = await _ollama_chat(MAP_PROMPT, user, model=OLLAMA_MAP_MODEL)
-        print(f"[llm]   구간 {i}/{len(chunks)} 정리 완료 ({len(note)}자)")
+        elapsed = time.time() - start
+        print(f"[llm]   구간 {i}/{len(chunks)} 정리 완료 ({len(note)}자) {elapsed:.1f}s")
         notes.append(note)
 
     # 계층적 reduce: 정리들의 합이 한도를 넘으면 그룹으로 통합해 접는다.

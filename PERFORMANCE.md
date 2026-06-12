@@ -117,14 +117,62 @@ CPU로만 동작한다. 즉 M2/M3의 GPU가 놀고, 실시간 자막을 보여�
 
 ---
 
-## 3. 향후 계획 — LoRA 파인튜닝 (distillation)
+## 3. LoRA 파인튜닝 — 7B map 품질 개선 (distillation)
 
-14B 출력을 정답(타깃)으로 삼아 **7B를 학습(knowledge distillation)** 하면, 7B가 거의 14B
-품질로 전체 파이프라인을 수행할 수 있다. 
+§1-4에서 확인한 **7B map의 recall 손실 문제**를 해결하기 위해, Claude가 생성한
+고품질 회의록을 타깃으로 삼아 Qwen2.5-7B를 파인튜닝했다.
 
-- 베이스: `Qwen2.5-7B` / 라이브러리: PEFT, TRL(SFTTrainer), bitsandbytes(4-bit)
-- 데이터: 전사문 → 14B 회의록 생성 → 큐레이션 → `instruction/input/output` JSON
-- 작업 위치: `ai-server/finetune/`
+### 3-1. 학습 설정
+
+| 항목 | 값 |
+|---|---|
+| 베이스 모델 | `Qwen/Qwen2.5-7B-Instruct` |
+| 기법 | QLoRA (4-bit) + LoRA rank 16, alpha 32 |
+| 학습 데이터 | 한국어 회의 51개 (Claude opus-4-8 생성 라벨) |
+| 플랫폼 | Google Colab T4 (15GB VRAM) |
+| 라이브러리 | Unsloth + HuggingFace Trainer |
+| Epochs | 3 (총 21 스텝) |
+| 학습 파라미터 | 40,370,176개 / 전체의 0.53% |
+| 관련 코드 | [ai-server/finetune/](ai-server/finetune/) |
+
+### 3-2. 전/후 비교 — 발표용 데모 원고 기준
+
+- 데이터: `ai-server/finetune/data/demo_meeting.txt` (10,504자 · 3청크)
+- 파이프라인: **7B map** + 14B reduce
+- 상세 비교 보고서: [ai-server/finetune/data/comparison_report.html](ai-server/finetune/data/comparison_report.html)
+
+#### MAP 단계 — 구간별 정리 스타일 변화
+
+| | Before LoRA (Base 7B) | After LoRA (Fine-tuned 7B) |
+|---|---|---|
+| 구간 1 | 할일 3개 (카테고리 없이 나열) | 스프린트 리뷰·API v2 설계·할일 섹션 분리 |
+| 구간 2 | 카테고리별 그룹 (PR/결제/DB) | 담당자별 할일 개별 나열 (10개) |
+| 구간 3 | 결정사항 + 핵심 할일 위주 | 세부 할일 전수 나열 (22개+) |
+
+LoRA 후 **섹션 구조화와 담당자 분리**가 개선됐으나, 구간 3에서 세부 항목 과다 추출 경향 확인.
+
+#### 최종 회의록 (REDUCE 14B 결과)
+
+| 항목 | Before LoRA | After LoRA |
+|---|---|---|
+| decisions | **6개** | 2개 |
+| todos | 8개 | **18개** |
+| questions | 1개 | 0개 |
+| next_agenda | 4개 | 3개 |
+
+- LoRA 후 todos 추출량이 대폭 증가(8→18)하고 decisions가 감소(6→2).
+- LoRA 모델이 map 단계에서 "할일" 형식으로 더 많이 추출하는 경향이 reduce 결과에 반영됨.
+- decisions/todos 구분이 다소 흐려지는 것은 학습 데이터(51개) 부족과 에폭 수(3)의 한계.
+
+### 3-3. 결론 및 개선 방향
+
+**성과:** 7B 모델이 한국어 회의 맥락을 더 잘 인식하고 구조화된 정리를 출력하게 됨.
+
+**한계:** 학습 데이터 51개는 distillation에 부족. 이상적으로는 300개 이상 필요하며,
+decisions/todos 구분 기준을 명확히 한 데이터 큐레이션이 필요하다.
+
+**서빙 관련:** 위 측정은 Ollama GGUF 서빙이 아닌 transformers float16으로 실행한 결과임.
+GGUF 변환 후 Ollama로 서빙하면 Base 7B와 **동일한 속도**로 운영 가능 (§1-4 참고).
 
 ---
 
@@ -132,12 +180,22 @@ CPU로만 동작한다. 즉 M2/M3의 GPU가 놀고, 실시간 자막을 보여�
 
 ```bash
 cd ai-server
+
 # Ollama + 모델 준비
 ollama pull qwen2.5:14b && ollama pull qwen2.5:7b
 
-# map 모델 A/B 비교 (Ollama만 떠 있으면 됨)
+# map 모델 A/B 비교 (§1-4)
 python test/compare_map_model.py /tmp/kconf/D20/G02/S000371 \
     --goal "국가교육위원회 교육정책 토론"
+
+# 발표용 데모 사전 계산 (§3, LoRA 전)
+OLLAMA_MAP_MODEL=qwen2.5:7b python finetune/precompute_demo.py --tag base
+
+# 발표용 데모 사전 계산 (§3, LoRA 후 — merged_model/ 필요)
+python finetune/precompute_lora.py
+
+# 전/후 비교 HTML 보고서 생성
+python finetune/compare_results.py --open
 
 # 실제 오디오 e2e (서버 실행 필요)
 bash start.sh   # 별도 터미널

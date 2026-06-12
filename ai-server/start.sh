@@ -19,5 +19,5 @@ if ! command -v ffmpeg &> /dev/null; then
   exit 1
 fi
 
-echo "[ai-server] 서버 시작 (port 8000)..."
+echo "[ai-server] 서버 시작 (port 8101)..."
 uvicorn main:app --host 0.0.0.0 --port 8101 --reload

@@ -9,3 +9,12 @@ claude.md
 # 테스트 파일
 ai-server/test_results
 
+# 모델 파일 (대용량)
+ai-server/finetune/merged_model/
+ai-server/finetune/lora_adapter/
+ai-server/finetune/Modelfile
+ai-server/finetune/*.gguf
+**/*.safetensors
+**/*.bin
+ai-server/.venv/
+

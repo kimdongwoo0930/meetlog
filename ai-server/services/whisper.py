@@ -51,12 +51,36 @@ _HALLUCINATION_PHRASES = {
     "한글자막 by",
     "mbc 뉴스",
     "kbs 뉴스",
+    "먹자",
+    "아마 아마 아마",
+    "아주 아주 아주" ,
+
+    # 영문 환각
+    "Thank you for watching",
+    "Please subscribe",
+    "www.",
+    "Kansas",
 }
 
 
 def _normalize(s: str) -> str:
     """환각/반복 비교용: 공백·문장부호 제거 후 소문자화"""
     return re.sub(r"[\s.,!?~…]+", "", s).lower()
+
+
+def remove_hallucinations(text: str) -> str:
+    # 1. 블랙리스트 문구 제거 (normalize 기준으로 비교)
+    normalized_text = _normalize(text)
+    for phrase in _HALLUCINATION_PHRASES:
+        if _normalize(phrase) in normalized_text:
+            text = re.sub(re.escape(phrase), "", text, flags=re.IGNORECASE)
+
+    # 2. 반복 단어 패턴 제거 (먹자 먹자 먹자 / 아마 아마 아마)
+    text = re.sub(r'(\b\S+\b)(\s+\1){2,}', '', text)
+
+    # 3. 중복 공백 정리
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
 
 
 def _transcribe_mlx(wav_path: str):
@@ -191,6 +215,11 @@ async def transcribe_audio(content: bytes, filename: str) -> str:
                 prev_norm = norm
 
         text = " ".join(seg.text.strip() for seg in filtered).strip()
+
+        # 연속 반복 패턴 제거 (세그먼트 단위로 못 잡은 것)
+        text = re.sub(r'(\b\S+\b)(\s+\1){2,}', '', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+
         print(f"[whisper] 최종 텍스트: {repr(text)}")
         return text
 
