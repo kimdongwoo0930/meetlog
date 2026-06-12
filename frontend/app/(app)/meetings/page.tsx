@@ -83,6 +83,46 @@ export default function MeetingsPage() {
             }}>첫 회의 시작하기</Link>
           </div>
         ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+          {/* 데모 더미 2개 */}
+          <div>
+            <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>
+              📌 AI 데모
+            </div>
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+              {[
+                { href: "/meetings/demo-lora",    title: "TaskFlow 스프린트 25 리뷰 & 26 플래닝 — 회의록", date: "2026.06.11", badge: "회의록 데모" },
+                { href: "/meetings/demo-stt",     title: "STT 원문 검토 — 추임새 필터 & 수정",             date: "2026.06.11", badge: "STT 데모" },
+                { href: "/meetings/demo-compare", title: "LoRA 파인튜닝 전/후 비교",                         date: "2026.06.11", badge: "AI 연구" },
+              ].map(({ href, title, date, badge }, i) => (
+                <div key={href} style={{
+                  display: "grid", gridTemplateColumns: "1fr 160px 100px 80px",
+                  padding: "16px 20px", alignItems: "center",
+                  borderBottom: i < 2 ? "1px solid var(--border)" : "none",
+                  background: "#fafaf8",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-primary)" }}>{title}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 999, background: "#faf5ff", color: "#9333ea", border: "1px solid #e9d5ff", flexShrink: 0 }}>{badge}</span>
+                  </div>
+                  <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>{date}</div>
+                  <div>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 500, padding: "3px 9px", borderRadius: 999, background: "#f0fdf4", color: "#16a34a", border: "1px solid #dcfce7" }}>
+                      <span style={{ width: 5, height: 5, borderRadius: "50%", background: "currentColor", display: "inline-block" }} />완료
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <Link href={href} style={{ fontSize: 12, color: "var(--text-tertiary)", padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", textDecoration: "none" }}>
+                      보기 →
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 실제 회의 목록 */}
           <div style={{
             background: "var(--surface)", border: "1px solid var(--border)",
             borderRadius: 12, overflow: "hidden",
@@ -133,6 +173,7 @@ export default function MeetingsPage() {
                 </div>
               </div>
             ))}
+          </div>
           </div>
         )}
       </div>
