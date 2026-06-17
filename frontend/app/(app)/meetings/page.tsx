@@ -91,15 +91,18 @@ export default function MeetingsPage() {
               📌 AI 데모
             </div>
             <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
-              {[
-                { href: "/meetings/demo-lora",    title: "TaskFlow 스프린트 25 리뷰 & 26 플래닝 — 회의록", date: "2026.06.11", badge: "회의록 데모" },
-                { href: "/meetings/demo-stt",     title: "STT 원문 검토 — 추임새 필터 & 수정",             date: "2026.06.11", badge: "STT 데모" },
-                { href: "/meetings/demo-compare", title: "LoRA 파인튜닝 전/후 비교",                         date: "2026.06.11", badge: "AI 연구" },
-              ].map(({ href, title, date, badge }, i) => (
+              {(() => { const DEMOS = [
+                { href: "/meetings/demo-lora",             title: "TaskFlow 스프린트 25 리뷰 & 26 플래닝 — 회의록 (긴 회의)", date: "2026.06.11", badge: "회의록 데모" },
+                { href: "/meetings/demo-stt",              title: "STT 원문 검토 — 추임새 필터 & 수정 (긴 회의)",            date: "2026.06.11", badge: "STT 데모" },
+                { href: "/meetings/demo-compare",          title: "LoRA 파인튜닝 전/후 비교 (긴 회의)",                       date: "2026.06.11", badge: "AI 연구" },
+                { href: "/meetings/demo-marketing",        title: "여름 신상품 런칭 마케팅 — 회의록 (짧은 회의)",            date: "2026.06.16", badge: "회의록 데모" },
+                { href: "/meetings/demo-marketing-stt",    title: "여름 마케팅 — STT 원문 검토 (짧은 회의)",                  date: "2026.06.16", badge: "STT 데모" },
+                { href: "/meetings/demo-marketing-stages", title: "여름 마케팅 — AI 처리 중간 단계 (짧은 회의)",              date: "2026.06.16", badge: "중간 단계" },
+              ]; return DEMOS.map(({ href, title, date, badge }, i) => (
                 <div key={href} style={{
                   display: "grid", gridTemplateColumns: "1fr 160px 100px 80px",
                   padding: "16px 20px", alignItems: "center",
-                  borderBottom: i < 2 ? "1px solid var(--border)" : "none",
+                  borderBottom: i < DEMOS.length - 1 ? "1px solid var(--border)" : "none",
                   background: "#fafaf8",
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -118,7 +121,7 @@ export default function MeetingsPage() {
                     </Link>
                   </div>
                 </div>
-              ))}
+              )); })()}
             </div>
           </div>
 

@@ -57,10 +57,10 @@ def _parse_header(lines: list[str]) -> tuple[str | None, str | None, list[str]]:
     return goal, agenda, body
 
 
-async def run(tag: str) -> None:
+async def run(tag: str, demo_file: Path = DEMO_FILE) -> None:
     out_path = DATA_DIR / f"demo_results_{tag}.json"
 
-    raw_lines = DEMO_FILE.read_text(encoding="utf-8").splitlines()
+    raw_lines = demo_file.read_text(encoding="utf-8").splitlines()
     goal, agenda, body_lines = _parse_header(raw_lines)
     transcript = "\n".join(body_lines).strip()
 
@@ -165,6 +165,8 @@ async def run(tag: str) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tag", default="base", help="결과 파일 접미사 (base | lora)")
+    parser.add_argument("--tag", default="base", help="결과 파일 접미사 (base | lora | marketing)")
+    parser.add_argument("--file", default=None, help="회의 원고 경로 (기본: demo_meeting.txt)")
     args = parser.parse_args()
-    asyncio.run(run(args.tag))
+    demo_file = Path(args.file) if args.file else DEMO_FILE
+    asyncio.run(run(args.tag, demo_file))
