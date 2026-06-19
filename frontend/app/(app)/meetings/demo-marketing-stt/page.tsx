@@ -90,7 +90,7 @@ export default function DemoSttPage() {
 
   const handleGenerate = () => {
     setGenerating(true);
-    setTimeout(() => router.push("/meetings/demo-marketing"), 2800);
+    setTimeout(() => router.push("/meetings/demo-marketing-stages"), 2800);
   };
 
   if (generating) {

@@ -143,7 +143,7 @@ export default function DemoSttPage() {
 
   const handleGenerate = () => {
     setGenerating(true);
-    setTimeout(() => router.push("/meetings/demo-lora"), 2800);
+    setTimeout(() => router.push("/meetings/demo-lora-stages"), 2800);
   };
 
   if (generating) {
