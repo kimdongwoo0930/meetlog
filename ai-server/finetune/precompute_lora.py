@@ -86,9 +86,10 @@ def lora_generate(model, tokenizer, system: str, user: str) -> str:
     return tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
 
 
-async def run():
+async def run(demo_file: Path = DEMO_FILE, tag: str = "lora", output_file: Path | None = None):
+    output_file = output_file or (Path(__file__).parent / "data" / f"demo_results_{tag}.json")
     # 데모 원고 로드
-    raw_lines = DEMO_FILE.read_text(encoding="utf-8").splitlines()
+    raw_lines = demo_file.read_text(encoding="utf-8").splitlines()
     goal, agenda, body_lines = _parse_header(raw_lines)
     transcript = "\n".join(body_lines).strip()
 
@@ -103,7 +104,7 @@ async def run():
     model, tokenizer = load_lora_model()
 
     result = {
-        "tag": "lora",
+        "tag": tag,
         "meta": {
             "transcript_chars": len(transcript),
             "chunk_size": OLLAMA_CHUNK_CHARS,
@@ -183,11 +184,19 @@ async def run():
     print("\n=== 최종 회의록 ===")
     print(json.dumps(result["final_minutes"], ensure_ascii=False, indent=2))
 
-    OUTPUT_FILE.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    output_file.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     total = map_total + elapsed
-    print(f"\n[lora] 저장 완료: {OUTPUT_FILE}")
+    print(f"\n[lora] 저장 완료: {output_file}")
     print(f"[lora] 총 소요  : {total:.1f}s")
 
 
 if __name__ == "__main__":
-    asyncio.run(run())
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--file", default=None, help="회의 원고 경로 (기본: demo_meeting.txt)")
+    parser.add_argument("--tag", default="lora", help="결과 파일 접미사 (예: lora, marketing-lora)")
+    parser.add_argument("--out", default=None, help="출력 JSON 경로 (기본: data/demo_results_{tag}.json)")
+    args = parser.parse_args()
+    demo_file = Path(args.file) if args.file else DEMO_FILE
+    out_file = Path(args.out) if args.out else None
+    asyncio.run(run(demo_file, args.tag, out_file))
